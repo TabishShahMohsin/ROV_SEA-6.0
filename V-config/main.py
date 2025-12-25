@@ -1,7 +1,7 @@
 import pygame
 import numpy as np
 import math
-import pigpio
+# import pigpio
 
 # Thruster pins
 thruster_1 = 17  # Center thruster 1
@@ -13,8 +13,8 @@ thruster_pins = [thruster_1, thruster_2, thruster_3, thruster_4]
 # Import components and updated config
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, FONT_SIZE,
-    PWM_NEUTRAL, PWM_RANGE,
-    MAX_AXIAL_FORCE, MAX_YAW_TORQUE
+    PWM_NEUTRAL,
+    MAX_AXIAL_FORCE, MAX_YAW_TORQUE, invert_thrusters, invert_pwm, MAX_THRUST
 )
 from input_handler import JoystickController
 from rov_kinematics import compute_thruster_forces
@@ -23,14 +23,26 @@ from drawing_utils import draw_rov, draw_thruster_vectors, draw_hud, draw_result
 
 def map_force_to_pwm(normalized_force):
     """Converts a normalized force [-1.0, 1.0] to a PWM signal [1200, 1800]."""
-    pwm_value = PWM_NEUTRAL + (normalized_force * PWM_RANGE)
-    pwm_value = max(PWM_NEUTRAL - PWM_RANGE, min(PWM_NEUTRAL + PWM_RANGE, pwm_value))
+    pwm_value = thrust_to_pwm(normalized_force)
     return int(round(pwm_value))
+
+def thrust_to_pwm(normalized_thrust):
+
+        thrust = normalized_thrust*MAX_THRUST 
+
+        if abs(thrust)<1e-2:
+            return 1500
+        elif thrust < 0:
+            coeffs = np.array([4.58585333,   35.21660561,  169.73509491, 1464.33710736])
+            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)
+        elif thrust > 0:
+            coeffs = np.array([2.22716503,  -22.41358258,  135.44774899, 1535.90291842])
+            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)           
 
 def set_all_thrusters(pi, pwm_values):
     """Send PWM values to all thrusters."""
-    for pin, pwm in zip(thruster_pins, pwm_values):
-        pi.set_servo_pulsewidth(pin, pwm)
+    for pin, pwm, I in zip(thruster_pins, pwm_values, invert_thrusters):
+        pi.set_servo_pulsewidth(pin, invert_pwm(pwm, I))
 
 def stop_all_thrusters(pi):
     """Set all thrusters to neutral (1500μs)."""
@@ -49,8 +61,8 @@ def main():
         return
 
     # Initialize pigpio and arm thrusters
-    pi = pigpio.pi()
-    stop_all_thrusters(pi)
+    # pi = pigpio.pi()
+    # stop_all_thrusters(pi)
 
     # Initialize simulation window
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -82,7 +94,7 @@ def main():
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
 
         # Apply PWM to thrusters
-        set_all_thrusters(pi, thruster_pwms)
+        # set_all_thrusters(pi, thruster_pwms)
 
         # Debug output
         print(f"T1:{thruster_pwms[0]:>5d} | T2:{thruster_pwms[1]:>5d} | "
@@ -95,10 +107,10 @@ def main():
         draw_resultant_vector(screen, rov_center, thruster_forces)
         draw_hud(screen, font, raw_inputs)
         pygame.display.flip()
-        clock.tick(5)
+        clock.tick(30)
 
     # On exit: stop thrusters safely
-    stop_all_thrusters(pi)
+    # stop_all_thrusters(pi)
     pygame.quit()
     print("\nSimulation exited.")
 

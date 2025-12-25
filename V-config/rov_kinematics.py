@@ -16,7 +16,7 @@ def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
     ])
 
     # "V" Configuration: T1(45), T2(135), T3(-45), T4(-135)
-    angles = np.deg2rad([45, 135, -45, -135]) # Thruster angles
+    angles = np.deg2rad([45, 135, -45, -135]) # Thruster angles from positive x-axis
     
     # Thruster Allocation Matrix (B): [Sway(x), Surge(y), Yaw(t)] x [T1, T2, T3, T4]
     B = np.zeros((3, 4))
@@ -29,7 +29,7 @@ def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
     v = np.array([desired_sway, desired_surge, desired_yaw]) 
     
     # Calculate required thruster forces using the pseudo-inverse (B+)
-    # This finds the most efficient (least-squares) force combination.
+    # This finds the (least-squares) force combination.
     thruster_forces = np.linalg.pinv(B) @ v
 
     # --- Saturation/Normalization ---

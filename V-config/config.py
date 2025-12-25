@@ -38,7 +38,7 @@ THRUSTER_ANGLES_DEG = [45, 135, -45, -135]
 SIN_45 = math.sin(math.radians(45)) # approx 0.7071
 
 # Maximum theoretical force/torque for "V" configuration
-#
+
 # Max axial (Surge/Sway) force = 4 * sin(45) * 1.0_thruster_force
 # (All 4 thrusters contribute, same as "X" config)
 MAX_AXIAL_FORCE = 4 * SIN_45  # approx 2.828
@@ -49,13 +49,40 @@ MAX_YAW_TORQUE = 2 * SIN_45 * (ROV_LENGTH_MM + ROV_WIDTH_MM) # approx 647.6
 
 # PWM Mapping Constants (T200)
 PWM_NEUTRAL = 1500
-PWM_RANGE = 70 # Max deviation from neutral
+MAX_THRUST = 2.35
+# This change was made due to problems in cancelling moments: from fixing PWM ranges to thrust ranges
+# Now this range of PWM is only to prevent accidental extreme values
+PWM_RANGE = 400 # Max deviation from neutral
 PWM_MIN = PWM_NEUTRAL - PWM_RANGE
 PWM_MAX = PWM_NEUTRAL + PWM_RANGE
 
 # Controller Type
 XBOX = "XBOX"
 PS = "PS"
+KEYBAORD = "KEYBOARD"
 
-CONTROLLER_TYPE = XBOX
-# CONTROLLER_TYPE = PS
+CONTROLLER_TYPE = KEYBAORD
+
+# Found mechanical team messing up the connections, as exchanging 2 would invert the direction of thrust
+# Fixing that in code
+I1 = False
+I2 = False
+I3 = False
+I4 = False
+I5 = False
+I6 = False
+I7 = False
+I8 = False
+
+invert_thrusters = [I1, I2, I3, I4, I5, I6, I7, I8]
+
+def invert_pwm(PWM, invert=False):
+    """
+    Docstring for invert_pwm
+    
+    :param PWM: PWM
+    :param invert: Bool denoting if to invert
+    """
+    if invert == True:
+        return PWM_NEUTRAL - (PWM - PWM_NEUTRAL)
+    return PWM

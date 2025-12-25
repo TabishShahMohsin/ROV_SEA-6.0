@@ -99,6 +99,11 @@ class KeyboardController:
         self.sway = self._approach(self.sway, target_sway, self.ramp_speed)
         self.yaw = self._approach(self.yaw, target_yaw, self.ramp_speed)
 
+        if self.surge ** 2 + self.sway ** 2 > 1:
+            r = (self.surge ** 2 + self.sway ** 2)**0.5
+            self.surge = self.surge / r
+            self.sway = self.sway / r
+
         return np.array([self.surge, self.sway, self.yaw])
 
     def _approach(self, current, target, step):

@@ -1,5 +1,23 @@
 import numpy as np
-from config import ROV_WIDTH_MM, ROV_LENGTH_MM # Import physical constants
+from config import ROV_WIDTH_MM, ROV_LENGTH_MM, MAX_THRUST # Import physical constants
+
+def map_force_to_pwm(normalized_force):
+    """Converts a normalized force [-1.0, 1.0] to a PWM signal [1200, 1800]."""
+    pwm_value = thrust_to_pwm(normalized_force)
+    return int(round(pwm_value))
+
+def thrust_to_pwm(normalized_thrust):
+
+        thrust = normalized_thrust*MAX_THRUST 
+
+        if abs(thrust)<1e-2:
+            return 1500
+        elif thrust < 0:
+            coeffs = np.array([4.58585333,   35.21660561,  169.73509491, 1464.33710736])
+            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)
+        elif thrust > 0:
+            coeffs = np.array([2.22716503,  -22.41358258,  135.44774899, 1535.90291842])
+            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)           
 
 def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
     """
@@ -40,3 +58,8 @@ def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
         thruster_forces /= max_force
 
     return thruster_forces
+
+    
+# Need PID code for the other 4 thrusters for:
+    # Getting the AUV exactly flat
+    # Fixing the depth of AUV to some constant value

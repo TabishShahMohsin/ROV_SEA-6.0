@@ -1,53 +1,63 @@
 import pygame
 import numpy as np
-import math
-# import pigpio
-
-# Thruster pins
-thruster_1 = 17  # Center thruster 1
-thruster_2 = 18  # Center Thruster 2
-thruster_3 = 22  # Left Thruster
-thruster_4 = 23  # Right Thruster
-thruster_pins = [thruster_1, thruster_2, thruster_3, thruster_4]
-
-# Import components and updated config
-from config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, FONT_SIZE,
-    PWM_NEUTRAL,
-    MAX_AXIAL_FORCE, MAX_YAW_TORQUE, invert_thrusters, invert_pwm, MAX_THRUST
-)
+import time
+import json
+import socket
+import threading
+from config import *
 from input_handler import JoystickController
-from rov_kinematics import compute_thruster_forces
+from rov_kinematics import compute_thruster_forces, map_force_to_pwm
 from drawing_utils import draw_rov, draw_thruster_vectors, draw_hud, draw_resultant_vector
 
+shared_data = {
+    "pwms": [1500] * 8,
+    "running": True
+}
 
-def map_force_to_pwm(normalized_force):
-    """Converts a normalized force [-1.0, 1.0] to a PWM signal [1200, 1800]."""
-    pwm_value = thrust_to_pwm(normalized_force)
-    return int(round(pwm_value))
+def command_sender():
+    """Sends PWM commands at a steady frequency."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Allows the port to be reused immediately after a crash
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
+    print("[Thread] Command Sender started.")
+    while shared_data["running"]:
+        try:
+            pwms = shared_data["pwms"]
+            pwm_commands = {
+                "t1": pwms[0], "t2": pwms[1], 
+                "t3": pwms[2], "t4": pwms[3]
+            }
+            sock.sendto(json.dumps(pwm_commands).encode(), (PI_IP, UDP_PORT_CMD))
+            time.sleep(0.05)  # 20Hz
+        except Exception as e:
+            print(f"Sender Error: {e}")
+            time.sleep(1)
 
-def thrust_to_pwm(normalized_thrust):
+def telemetry_listener():
+    """Listens for ROV feedback."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
+    try:
+        sock.bind(("0.0.0.0", UDP_PORT_DATA))
+        sock.settimeout(1.0) # Don't block forever if no data comes
+    except OSError as e:
+        print(f"Binding Error: {e}")
+        return
 
-        thrust = normalized_thrust*MAX_THRUST 
+    print("[Thread] Telemetry Listener started.")
+    while shared_data["running"]:
+        try:
+            data, addr = sock.recvfrom(1024)
+            telemetry = json.loads(data.decode())
+            # In a real app, you'd save this to a global for the HUD to draw
+            # print(f"ROV Status: {telemetry}") 
+        except socket.timeout:
+            continue
+        except Exception as e:
+            print(f"Listener Error: {e}")
 
-        if abs(thrust)<1e-2:
-            return 1500
-        elif thrust < 0:
-            coeffs = np.array([4.58585333,   35.21660561,  169.73509491, 1464.33710736])
-            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)
-        elif thrust > 0:
-            coeffs = np.array([2.22716503,  -22.41358258,  135.44774899, 1535.90291842])
-            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)           
-
-def set_all_thrusters(pi, pwm_values):
-    """Send PWM values to all thrusters."""
-    for pin, pwm, I in zip(thruster_pins, pwm_values, invert_thrusters):
-        pi.set_servo_pulsewidth(pin, invert_pwm(pwm, I))
-
-def stop_all_thrusters(pi):
-    """Set all thrusters to neutral (1500μs)."""
-    for pin in thruster_pins:
-        pi.set_servo_pulsewidth(pin, PWM_NEUTRAL)
 
 def main():
     pygame.init()
@@ -60,9 +70,6 @@ def main():
         pygame.quit()
         return
 
-    # Initialize pigpio and arm thrusters
-    # pi = pigpio.pi()
-    # stop_all_thrusters(pi)
 
     # Initialize simulation window
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -70,6 +77,11 @@ def main():
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, FONT_SIZE)
     rov_center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+
+    thread1 = threading.Thread(target=telemetry_listener, daemon=True)
+    thread2 = threading.Thread(target=command_sender, daemon=True)
+    thread1.start()
+    thread2.start()
 
     running = True
     while running:
@@ -92,9 +104,7 @@ def main():
 
         # Convert forces to PWM
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
-
-        # Apply PWM to thrusters
-        # set_all_thrusters(pi, thruster_pwms)
+        shared_data['pwms'] = thruster_pwms
 
         # Debug output
         print(f"T1:{thruster_pwms[0]:>5d} | T2:{thruster_pwms[1]:>5d} | "
@@ -110,8 +120,8 @@ def main():
         clock.tick(30)
 
     # On exit: stop thrusters safely
-    # stop_all_thrusters(pi)
     pygame.quit()
+    shared_data["running"] = False
     print("\nSimulation exited.")
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
-import pygame
 import math
+
+PI_IP = "192.168.1.11" # Replace with your Pi's IP
+UDP_PORT_DATA = 1345
+UDP_PORT_CMD = 1346
 
 # --- Screen Constants ---
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
@@ -49,12 +52,9 @@ MAX_YAW_TORQUE = 2 * SIN_45 * (ROV_LENGTH_MM + ROV_WIDTH_MM) # approx 647.6
 
 # PWM Mapping Constants (T200)
 PWM_NEUTRAL = 1500
-MAX_THRUST = 2.35
-# This change was made due to problems in cancelling moments: from fixing PWM ranges to thrust ranges
-# Now this range of PWM is only to prevent accidental extreme values
-PWM_RANGE = 400 # Max deviation from neutral
-PWM_MIN = PWM_NEUTRAL - PWM_RANGE
-PWM_MAX = PWM_NEUTRAL + PWM_RANGE
+
+# MAX thrust offered by an individual thruster
+MAX_THRUST = 2.35 # This change was made due to problems in cancelling moments: from fixing PWM ranges to thrust ranges
 
 # Controller Type
 XBOX = "XBOX"

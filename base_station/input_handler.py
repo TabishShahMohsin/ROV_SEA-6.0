@@ -99,6 +99,7 @@ class KeyboardController:
         self.sway = self._approach(self.sway, target_sway, self.ramp_speed)
         self.yaw = self._approach(self.yaw, target_yaw, self.ramp_speed)
 
+        # Found input from keybaord having r > 1
         if self.surge ** 2 + self.sway ** 2 > 1:
             r = (self.surge ** 2 + self.sway ** 2)**0.5
             self.surge = self.surge / r
@@ -121,7 +122,7 @@ if controller_type == XBOX:
     JoystickController = XboxController
 elif controller_type == PS:
     JoystickController = PSController
-elif controller_type == "KEYBOARD":
+elif controller_type == KEYBAORD:
     JoystickController = KeyboardController
 else:
     # Fallback: If no controller is found, don't crash, use Keyboard

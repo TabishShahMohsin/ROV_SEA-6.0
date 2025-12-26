@@ -94,13 +94,8 @@ def main():
         raw_inputs = controller.get_input_vector()
         raw_surge, raw_sway, raw_yaw = raw_inputs
 
-        # Convert to desired forces
-        desired_surge = raw_surge * MAX_AXIAL_FORCE
-        desired_sway = raw_sway * MAX_AXIAL_FORCE
-        desired_yaw = raw_yaw * MAX_YAW_TORQUE
-
         # Get thruster force distribution
-        thruster_forces = compute_thruster_forces(desired_surge, desired_sway, desired_yaw)
+        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, raw_yaw)
 
         # Convert forces to PWM
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]

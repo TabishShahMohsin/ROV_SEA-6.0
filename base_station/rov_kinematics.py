@@ -1,31 +1,40 @@
 import numpy as np
-from config import ROV_WIDTH_MM, ROV_LENGTH_MM, MAX_THRUST # Import physical constants
+from config import *
 
 def map_force_to_pwm(normalized_force):
     """Converts a normalized force [-1.0, 1.0] to a PWM signal [1200, 1800]."""
+
+    def thrust_to_pwm(normalized_thrust):
+
+            thrust = normalized_thrust*MAX_THRUST 
+
+            if abs(thrust)<1e-2:
+                return 1500
+            elif thrust < 0:
+                coeffs = np.array([4.58585333,   35.21660561,  169.73509491, 1464.33710736])
+                return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)
+            elif thrust > 0:
+                coeffs = np.array([2.22716503,  -22.41358258,  135.44774899, 1535.90291842])
+                return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)           
+
     pwm_value = thrust_to_pwm(normalized_force)
     return int(round(pwm_value))
 
-def thrust_to_pwm(normalized_thrust):
-
-        thrust = normalized_thrust*MAX_THRUST 
-
-        if abs(thrust)<1e-2:
-            return 1500
-        elif thrust < 0:
-            coeffs = np.array([4.58585333,   35.21660561,  169.73509491, 1464.33710736])
-            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)
-        elif thrust > 0:
-            coeffs = np.array([2.22716503,  -22.41358258,  135.44774899, 1535.90291842])
-            return float(np.array([thrust**3, thrust**2, thrust, 1]) @ coeffs)           
-
-def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
+def compute_thruster_forces(raw_surge, raw_sway, raw_yaw):
     """
     Computes thrust for 4 diagonal thrusters.
     
     Inputs are the SCALED desired physical forces/torques.
     Outputs are normalized thruster forces (-1.0 to 1.0).
     """
+
+    # Convert to desired forces
+    # Can find the desired values for the net thrust
+    theta = np.arctan2(raw_sway, raw_surge)
+    desired_surge = raw_surge * MAX_AXIAL_FORCE * abs(np.cos(theta))
+    desired_sway = raw_sway * MAX_AXIAL_FORCE * abs(np.sin(theta))
+    desired_yaw = raw_yaw * MAX_YAW_TORQUE
+
     positions = np.array([
         [-ROV_WIDTH_MM/2,  ROV_LENGTH_MM/2],  # T1 (Front-Left)
         [ ROV_WIDTH_MM/2,  ROV_LENGTH_MM/2],  # T2 (Front-Right)
@@ -34,7 +43,7 @@ def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
     ])
 
     # "V" Configuration: T1(45), T2(135), T3(-45), T4(-135)
-    angles = np.deg2rad([45, 135, -45, -135]) # Thruster angles from positive x-axis
+    angles = np.deg2rad(THRUSTER_ANGLES_DEG) # Thruster angles from positive x-axis
     
     # Thruster Allocation Matrix (B): [Sway(x), Surge(y), Yaw(t)] x [T1, T2, T3, T4]
     B = np.zeros((3, 4))
@@ -50,16 +59,10 @@ def compute_thruster_forces(desired_surge, desired_sway, desired_yaw):
     # This finds the (least-squares) force combination.
     thruster_forces = np.linalg.pinv(B) @ v
 
-    # --- Saturation/Normalization ---
-    # This step is critical: it finds the maximum required force and ensures 
-    # it does not exceed 1.0, scaling ALL forces proportionally if needed.
-    max_force = np.max(np.abs(thruster_forces))
-    if max_force > 1.0:
+    # --- Saturation/Normalization ---    # This step is critical: it finds the maximum required force and ensures     
+    # it does not exceed 1.0, scaling ALL forces proportionally if needed.    
+    max_force = np.max(np.abs(thruster_forces))    
+    if max_force > 1.0:        
         thruster_forces /= max_force
 
     return thruster_forces
-
-    
-# Need PID code for the other 4 thrusters for:
-    # Getting the AUV exactly flat
-    # Fixing the depth of AUV to some constant value

@@ -40,14 +40,14 @@ def draw_rov(screen, center_pos):
     draw_arrow(screen, WHITE, front_indicator_start, front_indicator_end, 5, 15)
 
     # Draw thruster mount points
-    for (tx, ty) in THRUSTER_POSITIONS:
+    for (tx, ty) in THRUSTER_POSITIONS_DRAWING:
         pygame.draw.circle(screen, WHITE, (cx + tx, cy + ty), 8, 2)
 
 def draw_thruster_vectors(screen, font, center_pos, forces):
     """Draws the force vectors and thruster labels."""
     cx, cy = center_pos
 
-    for i, (pos_offset, angle_deg, force) in enumerate(zip(THRUSTER_POSITIONS, THRUSTER_ANGLES_DEG, forces)):
+    for i, (pos_offset, angle_deg, force) in enumerate(zip(THRUSTER_POSITIONS_DRAWING, THRUSTER_ANGLES_DEG, forces)):
         angle_rad = math.radians(angle_deg)
         color = RED if force > 0 else BLUE # Red for positive, Blue for negative
         

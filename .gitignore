@@ -1,0 +1,69 @@
+# ==============================
+# Python bytecode
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==============================
+# Virtual environments
+# ==============================
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Conda environments
+conda-env/
+*.conda
+
+# ==============================
+# Distribution / packaging
+# ==============================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ==============================
+# Logs & runtime files
+# ==============================
+*.log
+*.pid
+
+# ==============================
+# IDEs / Editors
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==============================
+# OS files
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Testing / coverage
+# ==============================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==============================
+# Static analysis
+# ==============================
+.mypy_cache/
+.ruff_cache/
+
+# ==============================
+# ROS / Robotics (safe for ROV projects)
+# ==============================
+logs/
+bags/
+*.bag
+*.db3

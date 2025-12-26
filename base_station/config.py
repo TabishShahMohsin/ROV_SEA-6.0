@@ -1,8 +1,8 @@
 import math
 
-PI_IP = "192.168.1.11" # Replace with your Pi's IP
-UDP_PORT_DATA = 1345
-UDP_PORT_CMD = 1346
+PI_IP = "192.168.137.2" # Replace with your Pi's IP
+UDP_PORT_DATA = 5005
+UDP_PORT_CMD = 5006
 
 # --- ROV Physical Configuration (for Allocation Logic) ---
 ROV_WIDTH_MM = 262.629

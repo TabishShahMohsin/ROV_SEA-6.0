@@ -6,7 +6,7 @@ import subprocess
 import pigpio
 
 # --- Configuration ---
-PC_IP = "192.168.1.10"  # Replace with your Base Station IP
+PC_IP = "192.168.137.1"  # Replace with your Base Station IP
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     

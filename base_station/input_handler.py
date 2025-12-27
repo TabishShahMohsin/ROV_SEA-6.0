@@ -67,20 +67,30 @@ class PSController:
         return np.array([surge_input, sway_input, yaw_input])
 
 class KeyboardController:
-    """Mimics a controller using WASD and Arrow keys with smoothing."""
+    """Mimics a controller using WASD, Arrows, and Space/Shift for 6-DoF control."""
     def __init__(self, deadzone=0.0):
-        print("Keyboard Control Mode Active: Use WASD for Surge/Sway, Q/E or Arrows for Yaw")
+        print("6-DoF Keyboard Control Mode Active:")
+        print(" - WASD: Surge/Sway")
+        print(" - Q / E: Yaw")
+        print(" - Space / L-Shift: Heave (Up/Down)")
+        print(" - I / K: Pitch")
+        print(" - J / L: Roll")
+        
         # State for smoothing (0.0 to 1.0)
         self.surge = 0.0
         self.sway = 0.0
+        self.heave = 0.0
+        self.roll = 0.0
+        self.pitch = 0.0
         self.yaw = 0.0
-        self.ramp_speed = 0.1  # Adjust this to make it feel 'heavier' or 'snappier'
+        
+        self.ramp_speed = 0.1  # Smoothing factor
 
     def get_input_vector(self):
-        """Processes keyboard state and returns (surge, sway, yaw)."""
+        """Processes keyboard state and returns (surge, sway, heave, roll, pitch, yaw)."""
         keys = pygame.key.get_pressed()
 
-        # Target values based on key presses
+        # --- Linear Motion ---
         target_surge = 0.0
         if keys[pygame.K_w]: target_surge += 1.0
         if keys[pygame.K_s]: target_surge -= 1.0
@@ -89,23 +99,43 @@ class KeyboardController:
         if keys[pygame.K_d]: target_sway += 1.0
         if keys[pygame.K_a]: target_sway -= 1.0
 
-        target_yaw = 0.0
-        if keys[pygame.K_e] or keys[pygame.K_RIGHT]: target_yaw -= 1.0
-        if keys[pygame.K_q] or keys[pygame.K_LEFT]:  target_yaw += 1.0
+        target_heave = 0.0
+        if keys[pygame.K_SPACE]:  target_heave += 1.0
+        if keys[pygame.K_LSHIFT]: target_heave -= 1.0
 
-        # --- The "Smoothing Trick" ---
-        # Gradually move current values toward target values
+        # --- Rotational Motion ---
+        target_yaw = 0.0
+        if keys[pygame.K_e]: target_yaw -= 1.0
+        if keys[pygame.K_q]: target_yaw += 1.0
+
+        target_pitch = 0.0
+        if keys[pygame.K_i]: target_pitch += 1.0
+        if keys[pygame.K_k]: target_pitch -= 1.0
+
+        target_roll = 0.0
+        if keys[pygame.K_l]: target_roll += 1.0
+        if keys[pygame.K_j]: target_roll -= 1.0
+
+        # --- Apply Smoothing ---
         self.surge = self._approach(self.surge, target_surge, self.ramp_speed)
         self.sway = self._approach(self.sway, target_sway, self.ramp_speed)
+        self.heave = self._approach(self.heave, target_heave, self.ramp_speed)
+        self.roll = self._approach(self.roll, target_roll, self.ramp_speed)
+        self.pitch = self._approach(self.pitch, target_pitch, self.ramp_speed)
         self.yaw = self._approach(self.yaw, target_yaw, self.ramp_speed)
 
-        # Found input from keybaord having r > 1
-        if self.surge ** 2 + self.sway ** 2 > 1:
-            r = (self.surge ** 2 + self.sway ** 2)**0.5
-            self.surge = self.surge / r
-            self.sway = self.sway / r
+        # --- Normalization (Linear only) ---
+        # Prevents faster diagonal movement
+        linear_mags = np.sqrt(self.surge**2 + self.sway**2 + self.heave**2)
+        if linear_mags > 1.0:
+            self.surge /= linear_mags
+            self.sway /= linear_mags
+            self.heave /= linear_mags
 
-        return np.array([self.surge, self.sway, self.yaw])
+        return np.array([
+            self.surge, self.sway, self.heave, 
+            self.roll, self.pitch, self.yaw
+        ])
 
     def _approach(self, current, target, step):
         """Helper to move current value toward target by a small step."""
@@ -114,7 +144,6 @@ class KeyboardController:
         elif current > target:
             return max(current - step, target)
         return current
-
 
 controller_type = CONTROLLER_TYPE.upper()
 

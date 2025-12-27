@@ -11,7 +11,10 @@ from drawing_utils import draw_rov, draw_thruster_vectors, draw_hud, draw_result
 
 shared_data = {
     "pwms": [1500] * 8,
-    "running": True
+    "running": True,
+    "pressure": 1013.25, 
+    "temp": 24.5,
+    "timestamp": None
 }
 
 def command_sender():
@@ -26,7 +29,9 @@ def command_sender():
             pwms = shared_data["pwms"]
             pwm_commands = {
                 "t1": pwms[0], "t2": pwms[1], 
-                "t3": pwms[2], "t4": pwms[3]
+                "t3": pwms[2], "t4": pwms[3],
+                "t5": pwms[4], "t6": pwms[5],
+                "t7": pwms[6], "t8": pwms[7],
             }
             sock.sendto(json.dumps(pwm_commands).encode(), (PI_IP, UDP_PORT_CMD))
             time.sleep(0.05)  # 20Hz
@@ -51,8 +56,11 @@ def telemetry_listener():
         try:
             data, addr = sock.recvfrom(1024)
             telemetry = json.loads(data.decode())
+            shared_data['pressure'] = telemetry['pressure']
+            shared_data['temp'] = telemetry['temp']
+            shared_data['timstamp'] = telemetry['timestamp']
             # In a real app, you'd save this to a global for the HUD to draw
-            # print(f"ROV Status: {telemetry}") 
+            print(f"ROV Status: {telemetry}") 
         except socket.timeout:
             continue
         except Exception as e:
@@ -92,25 +100,29 @@ def main():
 
         # Read joystick input
         raw_inputs = controller.get_input_vector()
-        raw_surge, raw_sway, raw_yaw = raw_inputs
+        raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch, raw_yaw = raw_inputs
 
         # Get thruster force distribution
-        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, raw_yaw)
+        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch, raw_yaw)
 
         # Convert forces to PWM
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
         shared_data['pwms'] = thruster_pwms
 
         # Debug output
-        print(f"T1:{thruster_pwms[0]:>5d} | T2:{thruster_pwms[1]:>5d} | "
-              f"T3:{thruster_pwms[2]:>5d} | T4:{thruster_pwms[3]:>5d}", end='\r')
+        # Assuming thruster_pwms is a list or array of 8 integers
+        print(
+            f"H-THRUST: T1:{thruster_pwms[0]:>4d} T2:{thruster_pwms[1]:>4d} T3:{thruster_pwms[2]:>4d} T4:{thruster_pwms[3]:>4d} | "
+            f"V-THRUST: T5:{thruster_pwms[4]:>4d} T6:{thruster_pwms[5]:>4d} T7:{thruster_pwms[6]:>4d} T8:{thruster_pwms[7]:>4d}", 
+            end='\r'
+        )
 
         # Draw visuals
         screen.fill(BLACK)
-        draw_rov(screen, rov_center)
-        draw_thruster_vectors(screen, font, rov_center, thruster_forces)
-        draw_resultant_vector(screen, rov_center, thruster_forces)
-        draw_hud(screen, font, raw_inputs)
+        # draw_rov(screen, rov_center)
+        # draw_thruster_vectors(screen, font, rov_center, thruster_forces)
+        # draw_resultant_vector(screen, rov_center, thruster_forces)
+        # draw_hud(screen, font, raw_inputs)
         pygame.display.flip()
         clock.tick(30)
 

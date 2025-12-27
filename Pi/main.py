@@ -21,10 +21,8 @@ except subprocess.CalledProcessError as e:
 # --- Hardware Setup (GPIO Pins) ---
 # Adjust these to the physical pins connected to your ESC Signal wires
 THRUSTER_PINS = {
-    "t1": 17, 
-    "t2": 18, 
-    "t3": 27, 
-    "t4": 22
+    "t1": 17, "t2": 18, "t3": 27, "t4": 22, # Horizontal
+    "t5": 23, "t6": 24, "t7": 25, "t8": 8   # Vertical
 }
 
 # Initialize PiGPIO
@@ -53,14 +51,14 @@ def stop_all_thrusters():
     for pin in THRUSTER_PINS.values():
         pi.set_servo_pulsewidth(pin, 1500)
 
-# --- Start Video Streams ---
-video_cmd0 = (
-    f"gst-launch-1.0 v4l2src device=/dev/video0 ! "
-    f"video/x-raw,width=640,height=480,framerate=30/1 ! "
-    f"v4l2h264enc ! rtph264pay ! udpsink host={PC_IP} port=5000"
-)
-# Note: Use separate processes for multiple cameras
-subprocess.Popen(video_cmd0, shell=True)
+# # --- Start Video Streams ---
+# video_cmd0 = (
+#     f"gst-launch-1.0 v4l2src device=/dev/video0 ! "
+#     f"video/x-raw,width=640,height=480,framerate=30/1 ! "
+#     f"v4l2h264enc ! rtph264pay ! udpsink host={PC_IP} port=5000"
+# )
+# # Note: Use separate processes for multiple cameras
+# subprocess.Popen(video_cmd0, shell=True)
 
 # --- Background Threads ---
 def sensor_sender():
@@ -70,7 +68,6 @@ def sensor_sender():
         telemetry = {
             "pressure": 1013.25,
             "temp": 22.5,
-            "depth": 1.2,
             "timestamp": time.time()
         }
         try:
@@ -120,8 +117,10 @@ try:
         
         time.sleep(0.1)
 
+# Ensuring that ctrl + c works correctly
 except KeyboardInterrupt:
     print("\nShutting down script.")
+
 finally:
     is_running = False
     stop_all_thrusters()

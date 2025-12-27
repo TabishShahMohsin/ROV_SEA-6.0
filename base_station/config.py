@@ -1,6 +1,8 @@
 import math
+import socket
 
-PI_IP = "192.168.137.2" # Replace with your Pi's IP
+# PI_IP = "192.168.137.2" # Replace with your Pi's IP
+PI_IP = socket.gethostbyname("auv.local")
 UDP_PORT_DATA = 5005
 UDP_PORT_CMD = 5006
 
@@ -23,8 +25,10 @@ WHITE = (255, 255, 255)
 GRAY = (100, 100, 100)
 DARK_GRAY = (50, 50, 50)
 BLUE = (0, 170, 255)
+CYAN = (0, 255, 255)
 RED = (255, 50, 50)
 GREEN = (0, 200, 100)
+ORANGE = (255, 165, 0)
 YELLOW = (255, 255, 0) # <-- ADDED THIS
 VECTOR_SCALE = 80
 RESULTANT_VECTOR_SCALE = 50 # <-- ADDED THIS
@@ -50,6 +54,10 @@ MAX_AXIAL_FORCE = 4 * SIN_45  # approx 2.828
 # Max yaw torque = 2 * sin(45) * (L + W) * 1.0_thruster_force
 # (All 4 thrusters contribute)
 MAX_YAW_TORQUE = 2 * SIN_45 * (ROV_LENGTH_MM + ROV_WIDTH_MM) # approx 647.6
+
+MAX_HEAVE_FORCE = 4
+MAX_ROLL_TORQUE = 4 * ROV_WIDTH_MM / 2
+MAX_PITCH_TORQUE = 4 * ROV_LENGTH_MM / 2
 
 # PWM Mapping Constants (T200)
 PWM_NEUTRAL = 1500

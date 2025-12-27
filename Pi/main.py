@@ -3,125 +3,152 @@ import threading
 import time
 import json
 import subprocess
+from gpiozero import CPUTemperature
 import pigpio
 
+cpu = CPUTemperature()
+
 # --- Configuration ---
-PC_IP = "192.168.137.1"  # Replace with your Base Station IP
+# PC_IP = "192.168.137.1"  # Replace with your Base Station IP
+PC_IP = "10.51.148.179"  
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     
 
-# Trying to automate even sudo pigpiod in a single script
+# --- Ramping Constants ---
+RAMP_STEP = 15        # How many µs to change per loop iteration
+LOOP_FREQ = 0.05      # 20Hz update (50ms)
+
+# Global PWM States
+# target_pwms: what the base station is asking for
+# current_pwms: what is actually being sent to the ESCs right now
+target_pwms = {f"t{i}": 1500 for i in range(1, 9)}
+current_pwms = {f"t{i}": 1500 for i in range(1, 9)}
+
+telemetry = {
+    "pressure": 1013.25,
+    "temp": cpu.temperature,
+    "timestamp": time.time()
+}
+
 try:
     subprocess.run(['sudo', 'pigpiod'], check=True, capture_output=True, text=True)
-    print("pigpiod started successfully (or was already running).")
+    print("pigpiod started successfully.")
 except subprocess.CalledProcessError as e:
     print(f"Error starting pigpiod: {e.stderr}")
 
-# --- Hardware Setup (GPIO Pins) ---
-# Adjust these to the physical pins connected to your ESC Signal wires
 THRUSTER_PINS = {
-    "t1": 17, "t2": 18, "t3": 27, "t4": 22, # Horizontal
-    "t5": 23, "t6": 24, "t7": 25, "t8": 8   # Vertical
+    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
+    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
 }
 
-# Initialize PiGPIO
 pi = pigpio.pi()
 if not pi.connected:
-    print("Could not connect to pigpiod. Did you run 'sudo pigpiod'?")
     exit()
 
-# Global state
 last_command_time = time.time()
 is_running = True
 
-# --- Safety Functions ---
-def set_thruster_pwm(commands):
-    """Updates the physical PWM signals on the GPIO pins."""
-    for key, pin in THRUSTER_PINS.items():
-        if key in commands:
-            pwm_val = commands[key]
-            # Safety clamp to ensure values are within ESC limits
-            pwm_val = max(1100, min(1900, pwm_val))
-            pi.set_servo_pulsewidth(pin, pwm_val)
+# --- Ramping Functions ---
+
+def ramping_loop():
+    """Background thread that smoothly transitions current_pwms to target_pwms."""
+    global current_pwms
+    while is_running:
+        for key in target_pwms:
+            target = target_pwms[key]
+            current = current_pwms[key]
+            
+            if current < target:
+                current_pwms[key] = min(current + RAMP_STEP, target)
+            elif current > target:
+                current_pwms[key] = max(current - RAMP_STEP, target)
+            
+            # Apply the current (ramped) value to the GPIO
+            pwm_val = max(1100, min(1900, current_pwms[key]))
+            pi.set_servo_pulsewidth(THRUSTER_PINS[key], pwm_val)
+            
+        time.sleep(LOOP_FREQ)
 
 def stop_all_thrusters():
-    """Immediately sets all thrusters to neutral (1500us)."""
+    """Sets targets and current values back to neutral immediately."""
     print("!!! STOPPING ALL THRUSTERS (NEUTRAL) !!!")
-    for pin in THRUSTER_PINS.values():
-        pi.set_servo_pulsewidth(pin, 1500)
-
-# # --- Start Video Streams ---
-# video_cmd0 = (
-#     f"gst-launch-1.0 v4l2src device=/dev/video0 ! "
-#     f"video/x-raw,width=640,height=480,framerate=30/1 ! "
-#     f"v4l2h264enc ! rtph264pay ! udpsink host={PC_IP} port=5000"
-# )
-# # Note: Use separate processes for multiple cameras
-# subprocess.Popen(video_cmd0, shell=True)
+    for key in target_pwms:
+        target_pwms[key] = 1500
+        current_pwms[key] = 1500
+        pi.set_servo_pulsewidth(THRUSTER_PINS[key], 1500)
 
 # --- Background Threads ---
 def sensor_sender():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while is_running:
-        # Replace with real sensor reads (e.g., ms5837 library)
-        telemetry = {
+        telemetry_data = {
             "pressure": 1013.25,
-            "temp": 22.5,
+            "temp": cpu.temperature,
             "timestamp": time.time()
         }
         try:
-            message = json.dumps(telemetry).encode()
+            message = json.dumps(telemetry_data).encode()
             sock.sendto(message, (PC_IP, UDP_PORT_DATA))
         except Exception as e:
             print(f"Sensor error: {e}")
         time.sleep(0.1) 
 
 def command_receiver():
-    global last_command_time
+    global last_command_time, target_pwms
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.settimeout(0.5) # Don't hang if no commands come
+    sock.settimeout(0.5)
     sock.bind((PI_IP, UDP_PORT_CMD))
-    
-    print("Receiver Ready. Waiting for commands...")
     
     while is_running:
         try:
             data, addr = sock.recvfrom(1024)
-            commands = json.loads(data.decode())
+            new_cmds = json.loads(data.decode())
+            # Update targets only; the ramping_loop will handle the transition
+            for key, val in new_cmds.items():
+                if key in target_pwms:
+                    target_pwms[key] = val
             last_command_time = time.time()
-            set_thruster_pwm(commands)
         except socket.timeout:
             continue
         except Exception as e:
             print(f"Command error: {e}")
 
-# --- Main Logic / Watchdog ---
+# --- Main Logic ---
 try:
-    # Initialize thrusters to neutral
     stop_all_thrusters()
     
     t_sender = threading.Thread(target=sensor_sender, daemon=True)
     t_receiver = threading.Thread(target=command_receiver, daemon=True)
+    t_ramper = threading.Thread(target=ramping_loop, daemon=True)
     
     t_sender.start()
     t_receiver.start()
+    t_ramper.start()
 
     while True:
-        # HEARTBEAT WATCHDOG
-        # If no command received for more than 1 second, stop for safety
+        # Get actual hardware PWM values for display
+        p = [pi.get_servo_pulsewidth(THRUSTER_PINS[f"t{i}"]) for i in range(1, 9)]
+        p_curr = 1013.25 # Placeholder
+        depth = 0.0      # Placeholder
+
         if time.time() - last_command_time > 1.0:
             stop_all_thrusters()
             print("Warning: Connection lost. Idling thrusters...", end='\r')
+        else:
+            status_msg = f"D:{depth:>5.2f}m | CPU:{cpu.temperature:>4.1f}C"
+            dashboard = (
+                f"CURR_PWM:[{p[0]:>4} {p[1]:>4} {p[2]:>4} {p[3]:>4}] | "
+                f"V_PWM:[{p[4]:>4} {p[5]:>4} {p[6]:>4} {p[7]:>4}] | {status_msg}"
+            )
+            print(f"{dashboard:<150}", end='\r', flush=True)
         
         time.sleep(0.1)
 
-# Ensuring that ctrl + c works correctly
 except KeyboardInterrupt:
     print("\nShutting down script.")
-
 finally:
     is_running = False
     stop_all_thrusters()
-    pi.stop() # Close connection to pigpiod
+    pi.stop()

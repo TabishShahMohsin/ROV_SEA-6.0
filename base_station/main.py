@@ -60,7 +60,7 @@ def telemetry_listener():
             shared_data['temp'] = telemetry['temp']
             shared_data['timstamp'] = telemetry['timestamp']
             # In a real app, you'd save this to a global for the HUD to draw
-            print(f"ROV Status: {telemetry}") 
+            # print(f"ROV Status: {telemetry}") 
         except socket.timeout:
             continue
         except Exception as e:
@@ -109,13 +109,23 @@ def main():
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
         shared_data['pwms'] = thruster_pwms
 
-        # Debug output
-        # Assuming thruster_pwms is a list or array of 8 integers
-        print(
-            f"H-THRUST: T1:{thruster_pwms[0]:>4d} T2:{thruster_pwms[1]:>4d} T3:{thruster_pwms[2]:>4d} T4:{thruster_pwms[3]:>4d} | "
-            f"V-THRUST: T5:{thruster_pwms[4]:>4d} T6:{thruster_pwms[5]:>4d} T7:{thruster_pwms[6]:>4d} T8:{thruster_pwms[7]:>4d}", 
-            end='\r'
+        telemetry_str = f"P:{shared_data['pressure']:.2f} T:{shared_data['temp']:.1f}"
+        p_curr = shared_data["pressure"]
+        depth = max(0, (p_curr - 1013.25) * 100 / (1025 * 9.81))
+        p = shared_data["pwms"]
+        pi_temp = shared_data["temp"]
+        f = thruster_forces
+
+        dashboard = (
+            f"F_HOR:[{f[0]:>5.1f} {f[1]:>5.1f} {f[2]:>5.1f} {f[3]:>5.1f}] "
+            f"PWM_H:[{p[0]:>4} {p[1]:>4} {p[2]:>4} {p[3]:>4}] | "
+            f"F_VER:[{f[4]:>5.1f} {f[5]:>5.1f} {f[6]:>5.1f} {f[7]:>5.1f}] "
+            f"PWM_V:[{p[4]:>4} {p[5]:>4} {p[6]:>4} {p[7]:>4}] | "
+            f"D:{depth:>5.2f}m P:{p_curr:>7.2f}mb PI:{pi_temp:>4.1f}C"
         )
+
+        # Debug output
+        print(f"{dashboard:<180}", end='\r', flush=True)
 
         # Draw visuals
         screen.fill(BLACK)

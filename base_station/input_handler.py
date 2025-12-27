@@ -19,7 +19,13 @@ class XboxController:
         """Reads axes and returns (surge, sway, yaw)."""
         surge_input = -self.joystick.get_axis(1)   # Left stick Y (invert)
         sway_input = self.joystick.get_axis(0)     # Left stick X
+        heave_input = 0.0
+        if self.joystick.get_button(5): heave_input += 1.0  # RB
+        if self.joystick.get_button(4): heave_input -= 1.0  # LB
+
         yaw_input = (self.joystick.get_axis(5) - self.joystick.get_axis(2)) / 2  # Triggers
+        pitch_input = -self.joystick.get_axis(3) # Right stick Y (invert for nose up)
+        roll_input = self.joystick.get_axis(2)   # Right stick X
 
         # Found the r(=x2 + y2) for a joystick to be exceeding 1
         if (np.pow(surge_input, 2) + np.pow(sway_input, 2)) > 1:
@@ -27,15 +33,25 @@ class XboxController:
             surge_input = surge_input / r
             sway_input = sway_input / r
 
-        # Apply deadzone
-        surge_input = 0.0 if abs(surge_input) < self.deadzone else surge_input
-        sway_input = 0.0 if abs(sway_input) < self.deadzone else sway_input
-        yaw_input = 0.0 if abs(yaw_input) < self.deadzone else yaw_input
+        # Found the r(=x2 + y2) for a joystick to be exceeding 1
+        if (np.pow(pitch_input, 2) + np.pow(roll_input, 2)) > 1:
+            r = np.pow(np.pow(pitch_input, 2) + np.pow(roll_input, 2), 1/2)
+            pitch_input = pitch_input / r
+            roll_input = roll_input / r
 
-        return np.array([surge_input, sway_input, yaw_input])
+        inputs = np.array([
+            surge_input, sway_input, heave_input,
+            roll_input, pitch_input, yaw_input,
+        ])
+
+        # Apply deadzone
+        inputs[abs(inputs) < self.deadzone] = 0.0
+
+        return inputs
 
 
 class PSController:
+    # Can't find the PS4 controller for now
     """Handles connection and reading of a PS4/PS5 controller."""
     def __init__(self, deadzone=0.1):
         pygame.joystick.init()

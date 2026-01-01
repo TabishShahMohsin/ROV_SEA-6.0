@@ -419,7 +419,7 @@ dependencies:
       - astunparse==1.6.3
       - async-lru==2.0.5
       - atomicwrites==1.4.1
-      - attrs==25.3.0
+      - attrs==20.3.0
       - automat==25.4.16
       - autopep8==2.3.2
       - babel==2.17.0

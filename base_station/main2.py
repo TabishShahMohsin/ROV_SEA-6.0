@@ -6,6 +6,8 @@ import socket
 import threading
 import cv2
 import imagezmq
+from qr_scan import scan_qr_from_video
+from color_detection import detect_color_from_video
 from config import *
 from input_handler import JoystickController
 from rov_kinematics import compute_thruster_forces, map_force_to_pwm
@@ -76,25 +78,32 @@ def camera_receiver():
         print("[Thread] Camera Receiver ready - waiting for video feeds...")
         
         while shared_data["running"]:
-            try:
-                # recv_jpg() expects a compressed byte stream, not a raw array
+            try: 
                 cam_name, jpg_buffer = image_hub.recv_jpg()
-                
-                # Fast Decode: Convert bytes back to an image
-                # np.frombuffer is very fast (zero-copy)
                 image = cv2.imdecode(np.frombuffer(jpg_buffer, dtype='uint8'), -1)
                 
-                # Display
-                cv2.imshow(cam_name, image)
+                # Process based on which camera sent the frame
+                if cam_name == "PiCam_Feed":  
+                    detector = detect_color_from_video(image)
+                    for processed_frame in detector:
+                        cv2.imshow("Camera 1 - ColorDetection", processed_frame)
+                    
+                elif cam_name == "RealSense_Feed":  
+                    scanner = scan_qr_from_video(image) 
+                    for processed_frame, frame_info in scanner:
+                        cv2.imshow("Camera 2 - QRDetection", processed_frame)
+                        print(f"Frame {frame_info['frame_number']}: QRs detected: {frame_info['qrs_in_frame']}")
+                    
                 
-                # Send 'OK' reply so the Pi sends the next frame
+                else:
+                    # Default display for unknown cameras
+                    cv2.imshow(cam_name, image)
+                
                 image_hub.send_reply(b'OK')
                 
-                # Non-blocking waitKey
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    print("[Thread] Camera window 'q' pressed - closing feeds...")
                     break
-                    
+                
             except Exception as e:
                 print(f"Camera Receiver Error: {e}")
                 time.sleep(0.1)

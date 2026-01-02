@@ -11,6 +11,7 @@ cpu = CPUTemperature()
 # --- Configuration ---
 # PC_IP = "192.168.137.1"  # Replace with your Base Station IP
 PC_IP = "10.51.148.179"  
+# PC_IP = "10.38.254.107"
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     

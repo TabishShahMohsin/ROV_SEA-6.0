@@ -11,13 +11,12 @@ cpu = CPUTemperature()
 # --- Configuration ---
 # PC_IP = "192.168.137.1"  # Replace with your Base Station IP
 PC_IP = "10.51.148.179"  
-# PC_IP = "10.38.254.107"
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     
 
 # --- Ramping Constants ---
-RAMP_STEP = 15        # How many µs to change per loop iteration
+RAMP_STEP = 15        # How many Âµs to change per loop iteration
 LOOP_FREQ = 0.05      # 20Hz update (50ms)
 
 # Global PWM States
@@ -39,8 +38,8 @@ except subprocess.CalledProcessError as e:
     print(f"Error starting pigpiod: {e.stderr}")
 
 THRUSTER_PINS = {
-    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
-    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
+    "t1": 27, "t2": 17, "t3": 23, "t4": 22, 
+    "t5": 19, "t6": 13, "t7": 26, "t8": 6  
 }
 
 pi = pigpio.pi()

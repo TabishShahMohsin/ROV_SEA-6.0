@@ -24,8 +24,8 @@ class XboxController:
         if self.joystick.get_button(4): heave_input -= 1.0  # LB
 
         yaw_input = (self.joystick.get_axis(5) - self.joystick.get_axis(2)) / 2  # Triggers
-        pitch_input = -self.joystick.get_axis(3) # Right stick Y (invert for nose up)
-        roll_input = self.joystick.get_axis(2)   # Right stick X
+        pitch_input = -self.joystick.get_axis(4) # Right stick Y (invert for nose up)
+        roll_input = self.joystick.get_axis(3)   # Right stick X
 
         # Found the r(=x2 + y2) for a joystick to be exceeding 1
         if (np.pow(surge_input, 2) + np.pow(sway_input, 2)) > 1:

@@ -16,7 +16,7 @@ UDP_PORT_DATA = 5005
 UDP_PORT_CMD = 5006     
 
 # --- Ramping Constants ---
-RAMP_STEP = 15        # How many µs to change per loop iteration
+RAMP_STEP = 15        # How many Âµs to change per loop iteration
 LOOP_FREQ = 0.05      # 20Hz update (50ms)
 
 # Global PWM States
@@ -38,8 +38,8 @@ except subprocess.CalledProcessError as e:
     print(f"Error starting pigpiod: {e.stderr}")
 
 THRUSTER_PINS = {
-    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
-    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
+    "t1": 27, "t2": 17, "t3": 23, "t4": 22, 
+    "t5": 19, "t6": 13, "t7": 26, "t8": 6  
 }
 
 pi = pigpio.pi()
@@ -78,42 +78,52 @@ def stop_all_thrusters():
         current_pwms[key] = 1500
         pi.set_servo_pulsewidth(THRUSTER_PINS[key], 1500)
 
-# --- Background Threads ---
 def sensor_sender():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock = None
     while is_running:
-        telemetry_data = {
-            "pressure": 1013.25,
-            "temp": cpu.temperature,
-            "timestamp": time.time()
-        }
         try:
+            if sock is None:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            
+            telemetry_data = {
+                "pressure": 1013.25,
+                "temp": cpu.temperature,
+                "timestamp": time.time()
+            }
             message = json.dumps(telemetry_data).encode()
             sock.sendto(message, (PC_IP, UDP_PORT_DATA))
         except Exception as e:
-            print(f"Sensor error: {e}")
-        time.sleep(0.1) 
+            print(f"Sensor Socket Error: {e}. Retrying...")
+            if sock: sock.close()
+            sock = None # Force recreation
+        time.sleep(0.1)
 
 def command_receiver():
     global last_command_time, target_pwms
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.settimeout(0.5)
-    sock.bind((PI_IP, UDP_PORT_CMD))
+    sock = None
     
     while is_running:
         try:
+            if sock is None:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind((PI_IP, UDP_PORT_CMD))
+                sock.settimeout(0.5)
+            
             data, addr = sock.recvfrom(1024)
             new_cmds = json.loads(data.decode())
-            # Update targets only; the ramping_loop will handle the transition
             for key, val in new_cmds.items():
                 if key in target_pwms:
                     target_pwms[key] = val
             last_command_time = time.time()
+
         except socket.timeout:
             continue
         except Exception as e:
-            print(f"Command error: {e}")
+            print(f"Command Socket Error: {e}. Re-binding...")
+            if sock: sock.close()
+            sock = None
+            time.sleep(1) # Wait before trying to re-bind
 
 # --- Main Logic ---
 try:

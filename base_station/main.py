@@ -28,10 +28,10 @@ def command_sender():
         try:
             pwms = shared_data["pwms"]
             pwm_commands = {
-                "t1": pwms[0], "t2": pwms[1], 
-                "t3": pwms[2], "t4": pwms[3],
-                "t5": pwms[4], "t6": pwms[5],
-                "t7": pwms[6], "t8": pwms[7],
+                "t1": invert_pwm(pwms[0], I1), "t2": invert_pwm(pwms[1], I2), 
+                "t3": invert_pwm(pwms[2], I3), "t4": invert_pwm(pwms[3], I4),
+                "t5": invert_pwm(pwms[4], I5), "t6": invert_pwm(pwms[5], I6),
+                "t7": invert_pwm(pwms[6], I7), "t8": invert_pwm(pwms[7], I8),
             }
             sock.sendto(json.dumps(pwm_commands).encode(), (PI_IP, UDP_PORT_CMD))
             time.sleep(0.05)  # 20Hz

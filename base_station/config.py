@@ -70,7 +70,7 @@ XBOX = "XBOX"
 PS = "PS"
 KEYBAORD = "KEYBOARD"
 
-CONTROLLER_TYPE = KEYBAORD
+CONTROLLER_TYPE = XBOX
 
 # Found mechanical team messing up the connections, as exchanging 2 would invert the direction of thrust
 # Also 4 must in be in one sense and the other 4 in opp sense for cancelling torque generated about the propellers' axes

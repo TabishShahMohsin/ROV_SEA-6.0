@@ -13,20 +13,22 @@ import pyrealsense2 as rs
 from picamera2 import Picamera2
 import simplejpeg
 
+# Pi Temperature Sensor
 cpu = CPUTemperature()
 
-# --- Configuration ---
+# Configuration
 PC_IP = "10.51.148.179"  
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006
 CAMERA_PORT = 5555
 JPEG_QUALITY = 95
+THRUSTER_PINS = {
+    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
+    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
+}
 
-# Silence camera logs
-os.environ["LIBCAMERA_LOG_LEVELS"] = "3"
-
-# --- Ramping Constants --- (To Edit)
+# Ramping Constants 
 RAMP_STEP = 15        
 LOOP_FREQ = 0.05      
 
@@ -39,29 +41,28 @@ telemetry = {
     "temp": cpu.temperature,
     "timestamp": time.time()
 }
+last_command_time = time.time()
+is_running = True
 
+# Silence camera logs
+os.environ["LIBCAMERA_LOG_LEVELS"] = "3"
+
+# Running pigpio deamon if not already running
 try:
     subprocess.run(['sudo', 'pigpiod'], check=True, capture_output=True, text=True)
     print("pigpiod started successfully.")
 except subprocess.CalledProcessError as e:
     print(f"Error starting pigpiod: {e.stderr}")
 
-THRUSTER_PINS = {
-    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
-    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
-}
-
+# Initialize pigpio
 pi = pigpio.pi()
 if not pi.connected:
     exit()
 
-last_command_time = time.time()
-is_running = True
 
-# --- Ramping Functions ---
-
+# --- Thruster Functions ---
 def ramping_loop():
-    """Background thread that smoothly transitions current_pwms to target_pwms."""
+    # Background thread that smoothly transitions current_pwms to target_pwms
     global current_pwms
     while is_running:
         for key in target_pwms:
@@ -73,22 +74,25 @@ def ramping_loop():
             elif current > target:
                 current_pwms[key] = max(current - RAMP_STEP, target)
             
-            # Apply the current (ramped) value to the GPIO
-            pwm_val = max(1100, min(1900, current_pwms[key]))
+            # Apply the current value to the GPIO
+            pwm_val = max(1200, min(1800, current_pwms[key]))
             pi.set_servo_pulsewidth(THRUSTER_PINS[key], pwm_val)
             
         time.sleep(LOOP_FREQ)
 
+
 def stop_all_thrusters():
-    """Sets targets and current values back to neutral immediately."""
-    print("!!! STOPPING ALL THRUSTERS (NEUTRAL) !!!")
+    # Sets targets and current values back to neutral
+    print("!!! STOPPING ALL THRUSTERS !!!")
     for key in target_pwms:
         target_pwms[key] = 1500
         current_pwms[key] = 1500
         pi.set_servo_pulsewidth(THRUSTER_PINS[key], 1500)
 
+
 # --- Background Threads ---
 def sensor_sender():
+    # Sends telemetry data to the Base Station
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while is_running:
         telemetry_data = {
@@ -102,8 +106,10 @@ def sensor_sender():
         except Exception as e:
             print(f"Sensor error: {e}")
         time.sleep(0.1) 
+    
 
 def command_receiver():
+    # Receives PWM commands from the Base Station
     global last_command_time, target_pwms
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -124,7 +130,7 @@ def command_receiver():
             print(f"Command error: {e}")
 
 def camera_streamer():
-    """thread for camera streaming using the second script's logic."""
+    # Thread for camera streaming
     print(f"Camera Thread: Connecting to Base Station at {PC_IP}:{CAMERA_PORT}...")
     
     try:
@@ -211,22 +217,23 @@ def camera_streamer():
         if rs_pipeline: 
             rs_pipeline.stop()
 
+
 # --- Main Logic ---
 try:
     stop_all_thrusters()
     
+    # Start background threads
     t_sender = threading.Thread(target=sensor_sender, daemon=True)
     t_receiver = threading.Thread(target=command_receiver, daemon=True)
     t_ramper = threading.Thread(target=ramping_loop, daemon=True)
     t_camera = threading.Thread(target=camera_streamer, daemon=True)
-    
     t_sender.start()
     t_receiver.start()
     t_ramper.start()
     t_camera.start()
-    
     print("\n--- All threads started ---")
-
+    
+    
     while True:
         # Get actual hardware PWM values for display
         p = [pi.get_servo_pulsewidth(THRUSTER_PINS[f"t{i}"]) for i in range(1, 9)]
@@ -252,3 +259,4 @@ finally:
     is_running = False
     stop_all_thrusters()
     pi.stop()
+    

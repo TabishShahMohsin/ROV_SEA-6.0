@@ -4,24 +4,6 @@ from preprocessing import white_balance, contrast_enhancement, enhance_low_light
 
 
 def detect_color_from_video(video_source, assigned_color="GREEN", show_window=True, window_name='Color Detection'):
-    """
-    Detect red and green colors from a video source and yield processed frames.
-    
-    Parameters:
-    -----------
-    video_source : str or int
-        Path to video file (str) or camera index (int, e.g., 0 for default camera)
-    assigned_color : str, optional
-        The color assigned for detection ("RED" or "GREEN") (default: "GREEN")
-    show_window : bool, optional
-        Whether to display the video window during processing (default: True)
-    window_name : str, optional
-        Name of the display window (default: 'Color Detection')
-    
-    Yields:
-    -------
-    numpy.ndarray : processed_frame with color annotations and detection text
-    """
     cap = cv2.VideoCapture(video_source)
     
     if not cap.isOpened():

@@ -4,7 +4,7 @@ import imagezmq
 import numpy as np
 import pyrealsense2 as rs
 from picamera2 import Picamera2
-import simplejpeg  # <--- The Speed King
+import simplejpeg  
 import os
 
 # 1. Silence Logs

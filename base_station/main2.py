@@ -6,7 +6,7 @@ import socket
 import threading
 import cv2
 import imagezmq
-from qr_scan import scan_qr_from_video
+from qr_scan import process_frame_for_qr
 from color_detection import detect_color_from_video
 from config import *
 from input_handler import JoystickController
@@ -22,7 +22,7 @@ shared_data = {
 }
 
 def command_sender():
-    """Sends PWM commands at a steady frequency."""
+    # Sends PWM commands to the ROV
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # Allows the port to be reused immediately after a crash
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -44,7 +44,7 @@ def command_sender():
             time.sleep(1)
 
 def telemetry_listener():
-    """Listens for ROV feedback."""
+    # Listens for ROV's telemetry data
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
@@ -69,7 +69,7 @@ def telemetry_listener():
             print(f"Listener Error: {e}")
 
 def camera_receiver():
-    """Receives and displays camera feeds from the ROV."""
+    # Receives and displays camera feeds from the ROV
     print("[Thread] Camera Receiver starting...")
     
     try:
@@ -84,16 +84,15 @@ def camera_receiver():
                 
                 # Process based on which camera sent the frame
                 if cam_name == "PiCam_Feed":  
+                    # color detection on pi cam feed
                     detector = detect_color_from_video(image)
                     for processed_frame in detector:
                         cv2.imshow("Camera 1 - ColorDetection", processed_frame)
                     
                 elif cam_name == "RealSense_Feed":  
-                    scanner = scan_qr_from_video(image) 
-                    for processed_frame, frame_info in scanner:
-                        cv2.imshow("Camera 2 - QRDetection", processed_frame)
-                        print(f"Frame {frame_info['frame_number']}: QRs detected: {frame_info['qrs_in_frame']}")
-                    
+                    # QR code scanning on realsense feed
+                    processed_frame = process_frame_for_qr(image)
+                    cv2.imshow("Camera 2 - QRScan", processed_frame)                   
                 
                 else:
                     # Default display for unknown cameras

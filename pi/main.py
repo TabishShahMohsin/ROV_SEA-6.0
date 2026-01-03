@@ -38,8 +38,8 @@ except subprocess.CalledProcessError as e:
     print(f"Error starting pigpiod: {e.stderr}")
 
 THRUSTER_PINS = {
-    "t1": 27, "t2": 17, "t3": 23, "t4": 22, 
-    "t5": 19, "t6": 13, "t7": 26, "t8": 6  
+    "t1": 18, "t2": 23, "t3": 17, "t4": 27, 
+    "t5": 20, "t6": 13, "t7": 19, "t8": 6  
 }
 
 pi = pigpio.pi()

@@ -76,13 +76,13 @@ CONTROLLER_TYPE = XBOX
 # Also 4 must in be in one sense and the other 4 in opp sense for cancelling torque generated about the propellers' axes
 # Fixing that in code
 I1 = True
-I2 = True
+I2 = False
 I3 = False
-I4 = False # chal nhi rha
-I5 = True
-I6 = True
-I7 = True # Chal nhi rha
-I8 = True
+I4 = True # chal nhi rha
+I5 = False
+I6 = False
+I7 = False # Chal nhi rha
+I8 = False
 
 invert_thrusters = [I1, I2, I3, I4, I5, I6, I7, I8]
 

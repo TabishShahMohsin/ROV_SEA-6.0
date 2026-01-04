@@ -17,13 +17,13 @@ import subprocess
 
 # --- 1. HARDCODED CONFIGURATION ---
 THRUSTER_PINS = {
-    "t1": 17, "t2": 18, "t3": 27, "t4": 22, 
-    "t5": 23, "t6": 24, "t7": 25, "t8": 8  
+    "t1": 18, "t2": 23, "t3": 17, "t4": 27, 
+    "t5": 20, "t6": 13, "t7": 19, "t8": 6  
 }
 
 # 1 = Normal, -1 = Inverted. 
 # Change to -1 for any thruster that is spinning the wrong way.
-INVERSION_MASK = [-1, -1, 1, 1, -1, -1, -1, -1] 
+INVERSION_MASK = [-1, 1, 1, -1, -1, -1, -1, -1] 
 
 RAMP_STEP = 15
 LOOP_FREQ = 0.05

@@ -57,6 +57,9 @@ def compute_thruster_forces(raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch,
 
         # Desired Force Vector (v contains the scaled demands)
         v = np.array([desired_sway, desired_surge, desired_yaw]) 
+
+        # Getting the column for the failed thrusters as 0
+        B = B * failed_thrusters[0:4]
         
         # Calculate required thruster forces using the pseudo-inverse (B+)
         # This finds the (least-squares) force combination.
@@ -103,6 +106,9 @@ def compute_thruster_forces(raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch,
         # Desired Force Vector (v contains the scaled demands)
         v = np.array([desired_pitch, desired_roll, desired_heave]) 
         
+        # Getting the column for the failed thrusters as 0
+        B = B * failed_thrusters[4:8]
+
         # Calculate required thruster forces using the pseudo-inverse (B+)
         # This finds the (least-squares) force combination.
         thruster_forces = np.linalg.pinv(B) @ v

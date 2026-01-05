@@ -7,7 +7,6 @@ import threading
 from config import *
 from input_handler import JoystickController
 from rov_kinematics import compute_thruster_forces, map_force_to_pwm
-from drawing_utils import draw_rov, draw_thruster_vectors, draw_hud, draw_resultant_vector
 
 shared_data = {
     "pwms": [1500] * 8,
@@ -70,6 +69,9 @@ def telemetry_listener():
 def main():
     pygame.init()
 
+    screen = pygame.display.set_mode((400, 300))
+    pygame.display.set_caption("ROV_SEA-6.0 Controller")
+
     # Initialize input
     try:
         controller = JoystickController(deadzone=0.1)
@@ -78,13 +80,8 @@ def main():
         pygame.quit()
         return
 
-
     # Initialize simulation window
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("ROV Thruster Allocation Simulation")
     clock = pygame.time.Clock()
-    font = pygame.font.Font(None, FONT_SIZE)
-    rov_center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 
     thread1 = threading.Thread(target=telemetry_listener, daemon=True)
     thread2 = threading.Thread(target=command_sender, daemon=True)
@@ -117,9 +114,9 @@ def main():
         f = thruster_forces
 
         dashboard = (
-            f"F_HOR:[{f[0]:>5.1f} {f[1]:>5.1f} {f[2]:>5.1f} {f[3]:>5.1f}] "
+            f"F_HOR:[{f[0]:>5.3f} {f[1]:>5.3f} {f[2]:>5.3f} {f[3]:>5.3f}] "
             f"PWM_H:[{p[0]:>4} {p[1]:>4} {p[2]:>4} {p[3]:>4}] | "
-            f"F_VER:[{f[4]:>5.1f} {f[5]:>5.1f} {f[6]:>5.1f} {f[7]:>5.1f}] "
+            f"F_VER:[{f[4]:>5.3f} {f[5]:>5.3f} {f[6]:>5.3f} {f[7]:>5.3f}] "
             f"PWM_V:[{p[4]:>4} {p[5]:>4} {p[6]:>4} {p[7]:>4}] | "
             f"D:{depth:>5.2f}m P:{p_curr:>7.2f}mb PI:{pi_temp:>4.1f}C"
         )
@@ -127,13 +124,6 @@ def main():
         # Debug output
         print(f"{dashboard:<180}", end='\r', flush=True)
 
-        # Draw visuals
-        screen.fill(BLACK)
-        # draw_rov(screen, rov_center)
-        # draw_thruster_vectors(screen, font, rov_center, thruster_forces)
-        # draw_resultant_vector(screen, rov_center, thruster_forces)
-        # draw_hud(screen, font, raw_inputs)
-        pygame.display.flip()
         clock.tick(30)
 
     # On exit: stop thrusters safely

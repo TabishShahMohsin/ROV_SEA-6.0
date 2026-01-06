@@ -3,16 +3,25 @@ import socket
 import numpy as np
 
 '''
-        ---------------width-----------------
-    |    T1 (CW)                       T2 (CW)
+        ---------------------------width----------------------------
+    |    T1 (CW)                                         T2 (CW)
+    |
+    |                      
+    |           T5 (CCW)                          T6 (CW)
+    |                               x
+    |                               |  
+  length                            o ----- y 
+    |                                \
+    |                                 z (inwards)
+    |
+    |           T7 (CW)                            T8 (CCW)
     |
     |
-    |           T5 (CCW)      T6 (CW)
-  length
-    |           T7 (CW)       T8 (CCW)
-    |
-    |
-    |   T3 (CCW)                      T4 (CCW)
+    |   T3 (CCW)                                           T4 (CCW)
+
+    Force exerted by a thruster is taken +ve in the sense of pointing to x-axis for the lateral thrusters, and downwards for the vertical thrusters
+    Irrespective of CW/CCW propeller
+
 '''
 
 PI_IP = "192.168.137.2"
@@ -27,7 +36,6 @@ ROV_LENGTH_MM = 195.311
 THRUSTER_ANGLES_DEG = [45, 135, -45, -135] # From +ve x-axis
 
 SIN_45 = math.sin(math.radians(45))
-
 
 # MAX thrust offered by an individual thruster
 # This change was made due to problems in cancelling moments: from fixing PWM ranges to thrust ranges
@@ -52,10 +60,10 @@ I1 = True
 I2 = False
 I3 = False
 I4 = True 
-I5 = False
-I6 = False
-I7 = False
-I8 = False
+I5 = True
+I6 = True
+I7 = True
+I8 = True
 
 def invert_pwm(PWM, invert=True):
     if invert == True:
@@ -65,13 +73,13 @@ def invert_pwm(PWM, invert=True):
 
 # Due to unreliable electronics some thrusters tend to fail, only 6 thrusters with 3 lateral and 3 vertical are reuqired to attain 6 DOFs
 # However cacelling the counter rotor torque with one less thruster is impossible and hence unaccounted in such a failure
-F1 = 1 # else 0
-F2 = 1
-F3 = 1
-F4 = 1
-F5 = 1
-F6 = 1
-F7 = 1
-F8 = 1
+W1 = True
+W2 = True
+W3 = True
+W4 = True
+W5 = True
+W6 = True
+W7 = True
+W8 = True
 
-failed_thrusters = np.array([F1, F2, F3, F4, F5, F6, F7, F8])
+WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])

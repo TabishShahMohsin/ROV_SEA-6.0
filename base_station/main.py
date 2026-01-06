@@ -11,9 +11,8 @@ from rov_kinematics import compute_thruster_forces, map_force_to_pwm
 shared_data = {
     "pwms": [1500] * 8,
     "running": True,
-    "pressure": 1013.25, 
-    "temp": 24.5,
-    "timestamp": None
+    "pressure": 0, 
+    "temp": 0,
 }
 
 def command_sender():
@@ -57,7 +56,6 @@ def telemetry_listener():
             telemetry = json.loads(data.decode())
             shared_data['pressure'] = telemetry['pressure']
             shared_data['temp'] = telemetry['temp']
-            shared_data['timstamp'] = telemetry['timestamp']
             # In a real app, you'd save this to a global for the HUD to draw
             # print(f"ROV Status: {telemetry}") 
         except socket.timeout:
@@ -113,6 +111,10 @@ def main():
         pi_temp = shared_data["temp"]
         f = thruster_forces
 
+        # Things to add in Dashboard: Thrusts, Pwms for each thruster;
+        # Measured: Depth, roll, pitch, pi temp, pressure;
+        # Set: Depth, roll, pitch,
+        
         dashboard = (
             f"F_HOR:[{f[0]:>5.3f} {f[1]:>5.3f} {f[2]:>5.3f} {f[3]:>5.3f}] "
             f"PWM_H:[{p[0]:>4} {p[1]:>4} {p[2]:>4} {p[3]:>4}] | "

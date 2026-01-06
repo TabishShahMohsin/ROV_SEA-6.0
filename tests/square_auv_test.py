@@ -1,3 +1,6 @@
+# Failed misserably: Found that without IMU and pressure sensor, a floating vehicle isn't controllable with simple commands
+# Would need to change the script to work with PID and all
+
 """
 ROV/AUV MISSION CONTROL - SQUARE PATTERN AUTONOMY
 Description: 

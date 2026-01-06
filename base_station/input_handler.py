@@ -140,14 +140,6 @@ class KeyboardController:
         self.pitch = self._approach(self.pitch, target_pitch, self.ramp_speed)
         self.yaw = self._approach(self.yaw, target_yaw, self.ramp_speed)
 
-        # --- Normalization (Linear only) ---
-        # Prevents faster diagonal movement
-        linear_mags = np.sqrt(self.surge**2 + self.sway**2 + self.heave**2)
-        if linear_mags > 1.0:
-            self.surge /= linear_mags
-            self.sway /= linear_mags
-            self.heave /= linear_mags
-
         return np.array([
             self.surge, self.sway, self.heave, 
             self.roll, self.pitch, self.yaw

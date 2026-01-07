@@ -7,12 +7,27 @@ import threading
 from config import *
 from input_handler import JoystickController
 from rov_kinematics import compute_thruster_forces, map_force_to_pwm
+from pid import PID
+from kf import DepthKalmanFilter
+
+# It takes IMU 10s to start
+# for i in range(11):
+#     print(f"Starting CountDown: {11 - i}")
+#     time.sleep(1) 
 
 shared_data = {
+    # Shared from base station to pi
     "pwms": [1500] * 8,
     "running": True,
+    # Shared from pi to base station
+    "cpu_temp": 0,
+    "timestamp": 0, # Heart beat
     "pressure": 0, 
-    "temp": 0,
+    "depth": 0,
+    "water_temp": 0,
+    "roll": 0,
+    "pitch": 0,   
+    "yaw": 0     
 }
 
 def command_sender():
@@ -54,8 +69,14 @@ def telemetry_listener():
         try:
             data, addr = sock.recvfrom(1024)
             telemetry = json.loads(data.decode())
+            shared_data['cpu_temp'] = telemetry['cpu_temp']
+            shared_data['timestamp'] = telemetry['timestamp']
             shared_data['pressure'] = telemetry['pressure']
-            shared_data['temp'] = telemetry['temp']
+            shared_data['depth'] = telemetry['depth']
+            shared_data['water_temp'] = telemetry['water_temp']
+            shared_data['roll'] = telemetry['roll']
+            shared_data['pitch'] = telemetry['pitch']
+            shared_data['yaw'] = telemetry['yaw']
             # In a real app, you'd save this to a global for the HUD to draw
             # print(f"ROV Status: {telemetry}") 
         except socket.timeout:
@@ -66,11 +87,9 @@ def telemetry_listener():
 
 def main():
     pygame.init()
-
     screen = pygame.display.set_mode((400, 300))
-    pygame.display.set_caption("ROV_SEA-6.0 Controller")
+    clock = pygame.time.Clock()
 
-    # Initialize input
     try:
         controller = JoystickController(deadzone=0.1)
     except RuntimeError as e:
@@ -78,8 +97,14 @@ def main():
         pygame.quit()
         return
 
-    # Initialize simulation window
-    clock = pygame.time.Clock()
+    kf = DepthKalmanFilter()
+
+    depth_pid = PID(1.2, 0.1, 0.4, 1, -1)
+    target_depth = 0
+
+    target_roll = 0
+    target_pitch = 0
+    target_yaw = 0
 
     thread1 = threading.Thread(target=telemetry_listener, daemon=True)
     thread2 = threading.Thread(target=command_sender, daemon=True)
@@ -88,45 +113,57 @@ def main():
 
     running = True
     while running:
+        dt = clock.tick(30)/1000
+
         # Handle quit event
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
+        p_curr = shared_data["pressure"]
+        raw_depth = max(0, (p_curr - 1013.25) * 100 / (1025 * 9.81))
+        measured_depth = kf.update(raw_depth, dt)
+
         # Read joystick input
         raw_inputs = controller.get_input_vector()
         raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch, raw_yaw = raw_inputs
 
+        # --- HEAVE CONTROL LOGIC ---
+        target_depth += raw_heave * 0.5 * dt
+        heave_command = depth_pid.compute(measured_depth, target_depth, dt)
+
         # Get thruster force distribution
-        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch, raw_yaw)
+        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, heave_command, raw_roll, raw_pitch, raw_yaw)
 
         # Convert forces to PWM
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
         shared_data['pwms'] = thruster_pwms
 
-        telemetry_str = f"P:{shared_data['pressure']:.2f} T:{shared_data['temp']:.1f}"
-        p_curr = shared_data["pressure"]
-        depth = max(0, (p_curr - 1013.25) * 100 / (1025 * 9.81))
         p = shared_data["pwms"]
-        pi_temp = shared_data["temp"]
+        pi_temp = shared_data["water_temp"]
         f = thruster_forces
-
-        # Things to add in Dashboard: Thrusts, Pwms for each thruster;
-        # Measured: Depth, roll, pitch, pi temp, pressure;
-        # Set: Depth, roll, pitch,
         
         dashboard = (
-            f"F_HOR:[{f[0]:>5.3f} {f[1]:>5.3f} {f[2]:>5.3f} {f[3]:>5.3f}] "
-            f"PWM_H:[{p[0]:>4} {p[1]:>4} {p[2]:>4} {p[3]:>4}] | "
-            f"F_VER:[{f[4]:>5.3f} {f[5]:>5.3f} {f[6]:>5.3f} {f[7]:>5.3f}] "
-            f"PWM_V:[{p[4]:>4} {p[5]:>4} {p[6]:>4} {p[7]:>4}] | "
-            f"D:{depth:>5.2f}m P:{p_curr:>7.2f}mb PI:{pi_temp:>4.1f}C"
+            f"\033[H"  # Move cursor to top-left (Home)
+            f"--- ROV_SEA-6.0 DASHBOARD ---\n"
+            f"SYSTEM: Pressure: {p_curr:>7.2f} mb | Pi Temp: {pi_temp:>4.1f}°C\n"
+            f"{'-'*60}\n"
+            f"THRUSTERS (Forces & PWMs):\n"
+            f"  Horizontal: T1:{f[0]:>6.2f}({p[0]}) T2:{f[1]:>6.2f}({p[1]}) T3:{f[2]:>6.2f}({p[2]}) T4:{f[3]:>6.2f}({p[3]})\n"
+            f"  Vertical:   T5:{f[4]:>6.2f}({p[4]}) T6:{f[5]:>6.2f}({p[5]}) T7:{f[6]:>6.2f}({p[6]}) T8:{f[7]:>6.2f}({p[7]})\n"
+            f"{'-'*60}\n"
+            f"NAVIGATION:      {'[SETPOINT]':<15} {'[MEASURED]':<15}\n"
+            f"  Depth (m):     {target_depth:>15.2f} {shared_data['depth']:>15.2f}\n"
+            f"  Roll  (°):     {target_roll:>15.2f} {shared_data['roll']:>15.2f}\n"
+            f"  Pitch (°):     {target_pitch:>15.2f} {shared_data['pitch']:>15.2f}\n"
+            f"  Yaw   (°):     {target_yaw:>15.2f} {shared_data['yaw']:>15.2f}\n"
+            f"{'-'*60}\n"
+            f"Status: RUNNING | Frequency: {clock.get_fps():.1f} FPS"
         )
 
-        # Debug output
-        print(f"{dashboard:<180}", end='\r', flush=True)
+        # Clear screen once at start or just use the Home cursor trick
+        print(dashboard, end='', flush=True)
 
-        clock.tick(30)
 
     # On exit: stop thrusters safely
     pygame.quit()

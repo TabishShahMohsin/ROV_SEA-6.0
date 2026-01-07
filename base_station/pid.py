@@ -1,25 +1,42 @@
-class PID():
-    def __init__(self, KP, KI, KD, target=0):
+import math
+
+class PID:
+    def __init__(self, KP, KI, KD, limit_max, limit_min, is_angle=False):
         self.kp = KP
         self.ki = KI
         self.kd = KD
-        self.sp = target
-        self.error_last = 0
-        self.integral_error = 0
-        self.saturation_max = 1800
-        self.saturation_min = 1200
+        self.limit_max = limit_max
+        self.limit_min = limit_min
+        self.is_angle = is_angle # Enable for Yaw/Roll/Pitch
 
-    def compute(self, pos, sp, dt):
-        # compute the error
-        error = sp - pos
-        # find the derivative of the error (how the error changes with time)
-        derivative_error = (error - self.error_last) / dt
-        # error build up over time
-        self.integral_error += error * dt
-        output = self.kp * error + self.ki * self.integral_error + self.kd * derivative_error
-        self.error_last = error
-        if output > self.saturation_max:
-            output = self.saturation_max
-        elif output < self.saturation_min:
-            output = self.saturation_min
+        self.integral = 0
+        self.prev_error = 0
+
+    def compute(self, measurement, setpoint, dt):
+        error = setpoint - measurement
+        
+        # Logic for Angles: Shortest path wrap (e.g. 350->10 is +20, not -340)
+        if self.is_angle:
+            error = (error + math.pi) % (2 * math.pi) - math.pi
+
+        # Proportional
+        p_out = self.kp * error
+
+        # Integral
+        self.integral += error * dt
+        # Anti-windup (clamp integral contribution)
+        limit_i = abs(self.limit_max) * 0.5 
+        self.integral = max(min(self.integral, limit_i), -limit_i)
+        i_out = self.ki * self.integral
+
+        # Derivative
+        derivative = (error - self.prev_error) / dt
+        d_out = self.kd * derivative
+
+        output = p_out + i_out + d_out
+        
+        # Saturation
+        output = max(min(output, self.limit_max), self.limit_min)
+        
+        self.prev_error = error
         return output

@@ -21,11 +21,12 @@ import numpy as np
 
     Force exerted by a thruster is taken +ve in the sense of pointing to x-axis for the lateral thrusters, and downwards for the vertical thrusters
     Irrespective of CW/CCW propeller
+    SI units are used: m, s
 
 '''
 
-PI_IP = "192.168.137.2"
-#PI_IP = socket.gethostbyname("auv.local")
+#PI_IP = "192.168.137.2"
+PI_IP = socket.gethostbyname("auv.local")
 UDP_PORT_DATA = 5005
 UDP_PORT_CMD = 5006
 
@@ -83,3 +84,8 @@ W7 = True
 W8 = True
 
 WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])
+
+# To be implemented
+RECORD_SENSORS = False
+RECORD_FOOTAGE = False
+auto_depth_hold = True

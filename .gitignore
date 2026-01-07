@@ -67,3 +67,5 @@ logs/
 bags/
 *.bag
 *.db3
+
+data/

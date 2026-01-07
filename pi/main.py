@@ -27,8 +27,13 @@ current_pwms = {f"t{i}": 1500 for i in range(1, 9)}
 
 telemetry = {
     "pressure": 1013.25,
-    "temp": cpu.temperature,
-    "timestamp": time.time()
+    "depth": 0,
+    "cpu_temp": cpu.temperature,
+    "ps_temp": 0,
+    "timestamp": time.time(),
+    "roll": time.time(),
+    "pitch": time.time(),   
+    "yaw": time.time()     
 }
 
 try:

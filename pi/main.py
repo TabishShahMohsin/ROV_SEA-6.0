@@ -5,12 +5,22 @@ import json
 import subprocess
 from gpiozero import CPUTemperature
 import pigpio
+import cv2
+import imagezmq
+import pyrealsense2 as rs
+import numpy as np
+import ms5837
+
+
+sensor = ms5837.MS5837_30BA()
+sensor.init()
 
 cpu = CPUTemperature()
 
 # --- Configuration ---
 # PC_IP = "192.168.137.1"  # Replace with your Base Station IP
-PC_IP = "10.51.148.179"  
+# PC_IP = socket.gethostbyname("laptop.local")
+PC_IP = "192.168.0.113"
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     
@@ -54,6 +64,50 @@ if not pi.connected:
 last_command_time = time.time()
 is_running = True
 
+SENDER = imagezmq.ImageSender(connect_to=f'tcp://{PC_IP}:5555')
+HOSTNAME = socket.gethostname()
+
+def video_stream_loop():
+    """Thread to capture from RealSense and PiCam and send via ImageZMQ."""
+    # 1. Initialize RealSense
+    pipeline = rs.pipeline()
+    config = rs.config()
+    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    
+    # 2. Initialize PiCam (using OpenCV index 0)
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    try:
+        pipeline.start(config)
+        print("RealSense and PiCam streams started.")
+    except Exception as e:
+        print(f"Camera Startup Error: {e}")
+
+    while is_running:
+        try:
+            # --- Handle RealSense ---
+            frames = pipeline.wait_for_frames(timeout_ms=100)
+            color_frame = frames.get_color_frame()
+            if color_frame:
+                realsense_img = np.asanyarray(color_frame.get_data())
+                # Label the stream so the Base Station knows which is which
+                SENDER.send_image(f"{HOSTNAME}_realsense", realsense_img)
+
+            # --- Handle PiCam ---
+            ret, picam_img = cap.read()
+            if ret:
+                SENDER.send_image(f"{HOSTNAME}_picam", picam_img)
+
+        except Exception as e:
+            # Prevent the whole script from crashing if a frame drops
+            time.sleep(0.1)
+            continue
+
+    pipeline.stop()
+    cap.release()
+
 # --- Ramping Functions ---
 
 def ramping_loop():
@@ -89,12 +143,18 @@ def sensor_sender():
         try:
             if sock is None:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            
+            sensor.read(),
             telemetry_data = {
-                "pressure": 1013.25,
-                "temp": cpu.temperature,
-                "timestamp": time.time()
+                "pressure": sensor.pressure(),
+                "cpu_temp": cpu.temperature,
+                "timestamp": time.time(),
+                "depth": sensor.depth(),
+                "water_temp": sensor.temperature(),
+                "roll": 2,
+                "pitch": 2,   
+                "yaw": 2     
             }
+            
             message = json.dumps(telemetry_data).encode()
             sock.sendto(message, (PC_IP, UDP_PORT_DATA))
         except Exception as e:
@@ -137,10 +197,12 @@ try:
     t_sender = threading.Thread(target=sensor_sender, daemon=True)
     t_receiver = threading.Thread(target=command_receiver, daemon=True)
     t_ramper = threading.Thread(target=ramping_loop, daemon=True)
-    
+    t_video = threading.Thread(target=video_stream_loop, daemon=True)
+
     t_sender.start()
     t_receiver.start()
     t_ramper.start()
+    t_video.start()
 
     while True:
         # Get actual hardware PWM values for display

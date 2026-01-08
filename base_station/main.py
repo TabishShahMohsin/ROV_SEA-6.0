@@ -9,6 +9,8 @@ from input_handler import JoystickController
 from rov_kinematics import compute_thruster_forces, map_force_to_pwm
 from pid import PID
 from kf import DepthKalmanFilter
+import cv2
+import imagezmq
 
 # It takes IMU 10s to start
 # for i in range(11):
@@ -29,6 +31,33 @@ shared_data = {
     "pitch": 0,   
     "yaw": 0     
 }
+
+def video_receiver():
+    """Listens for video streams and displays them in separate windows."""
+    image_hub = imagezmq.ImageHub()
+    print("[Thread] Video Receiver started. Waiting for frames...")
+    
+    while shared_data["running"]:
+        try:
+            # recv_image returns the name of the stream (e.g., 'auv_realsense') 
+            # and the image itself
+            cam_id, frame = image_hub.recv_image()
+            
+            # Display based on which camera sent it
+            cv2.imshow(cam_id, frame)
+            
+            # Necessary for OpenCV to process window events
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+                
+            # Acknowledge receipt to the sender (required by imagezmq)
+            image_hub.send_reply(b'OK')
+            
+        except Exception as e:
+            print(f"Video Receiver Error: {e}")
+            time.sleep(1)
+
+    cv2.destroyAllWindows()
 
 def command_sender():
     """Sends PWM commands at a steady frequency."""
@@ -71,7 +100,7 @@ def telemetry_listener():
             telemetry = json.loads(data.decode())
             shared_data['cpu_temp'] = telemetry['cpu_temp']
             shared_data['timestamp'] = telemetry['timestamp']
-            shared_data['pressure'] = telemetry['pressure']
+            shared_data['pressure'] = telemetry['pressure'] - PRESSURE_OFFSET
             shared_data['depth'] = telemetry['depth']
             shared_data['water_temp'] = telemetry['water_temp']
             shared_data['roll'] = telemetry['roll']
@@ -108,8 +137,11 @@ def main():
 
     thread1 = threading.Thread(target=telemetry_listener, daemon=True)
     thread2 = threading.Thread(target=command_sender, daemon=True)
+    thread3 = threading.Thread(target=video_receiver, daemon=True)
+
     thread1.start()
     thread2.start()
+    thread3.start()
 
     running = True
     while running:
@@ -144,7 +176,7 @@ def main():
         f = thruster_forces
         
         dashboard = (
-            f"\033[H"  # Move cursor to top-left (Home)
+#            f"\033[H"  # Move cursor to top-left (Home)
             f"--- ROV_SEA-6.0 DASHBOARD ---\n"
             f"SYSTEM: Pressure: {p_curr:>7.2f} mb | Pi Temp: {pi_temp:>4.1f}°C\n"
             f"{'-'*60}\n"
@@ -162,7 +194,7 @@ def main():
         )
 
         # Clear screen once at start or just use the Home cursor trick
-        print(dashboard, end='', flush=True)
+        print(dashboard, end='', flush=False)
 
 
     # On exit: stop thrusters safely

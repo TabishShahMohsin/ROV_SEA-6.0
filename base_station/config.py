@@ -25,7 +25,7 @@ import numpy as np
 
 '''
 
-#PI_IP = "192.168.137.2"
+# PI_IP = "192.168.137.2"
 PI_IP = socket.gethostbyname("auv.local")
 UDP_PORT_DATA = 5005
 UDP_PORT_CMD = 5006
@@ -84,6 +84,11 @@ W7 = True
 W8 = True
 
 WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])
+
+# Things to Calibrate:
+
+PRESSURE_OFFSET = 980 - 101,325
+
 
 # To be implemented
 RECORD_SENSORS = False

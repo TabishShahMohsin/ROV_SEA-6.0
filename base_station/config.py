@@ -87,7 +87,7 @@ WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])
 
 # Things to Calibrate:
 
-PRESSURE_OFFSET = 980 - 101,325
+PRESSURE_OFFSET = 980 - 101,325 # Pressure isn't exactly p_atm, but changes for whether and location
 
 
 # To be implemented

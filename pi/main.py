@@ -20,7 +20,8 @@ cpu = CPUTemperature()
 # --- Configuration ---
 # PC_IP = "192.168.137.1"  # Replace with your Base Station IP
 # PC_IP = socket.gethostbyname("laptop.local")
-PC_IP = "192.168.0.113"
+# PC_IP = "192.168.0.113"
+PC_IP = socket.gethostbyname('Tabishs-MacBook-Air.local')
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     

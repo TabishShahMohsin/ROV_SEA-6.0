@@ -29,7 +29,8 @@ shared_data = {
     "water_temp": 0,
     "roll": 0,
     "pitch": 0,   
-    "yaw": 0     
+    "yaw": 0,     
+    "last_frames": {}
 }
 
 def video_receiver():
@@ -44,11 +45,10 @@ def video_receiver():
             cam_id, frame = image_hub.recv_image()
             
             # Display based on which camera sent it
-            cv2.imshow(cam_id, frame)
-            
-            # Necessary for OpenCV to process window events
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            shared_data['last_frames'][cam_id] = frame
+            # cv2.imshow(cam_id, frame) # Can't do this in demon thread
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     break
                 
             # Acknowledge receipt to the sender (required by imagezmq)
             image_hub.send_reply(b'OK')
@@ -107,7 +107,6 @@ def telemetry_listener():
             shared_data['pitch'] = telemetry['pitch']
             shared_data['yaw'] = telemetry['yaw']
             # In a real app, you'd save this to a global for the HUD to draw
-            # print(f"ROV Status: {telemetry}") 
         except socket.timeout:
             continue
         except Exception as e:
@@ -176,7 +175,7 @@ def main():
         f = thruster_forces
         
         dashboard = (
-#            f"\033[H"  # Move cursor to top-left (Home)
+            f"\033[H"  # Move cursor to top-left (Home)
             f"--- ROV_SEA-6.0 DASHBOARD ---\n"
             f"SYSTEM: Pressure: {p_curr:>7.2f} mb | Pi Temp: {pi_temp:>4.1f}°C\n"
             f"{'-'*60}\n"
@@ -185,7 +184,7 @@ def main():
             f"  Vertical:   T5:{f[4]:>6.2f}({p[4]}) T6:{f[5]:>6.2f}({p[5]}) T7:{f[6]:>6.2f}({p[6]}) T8:{f[7]:>6.2f}({p[7]})\n"
             f"{'-'*60}\n"
             f"NAVIGATION:      {'[SETPOINT]':<15} {'[MEASURED]':<15}\n"
-            f"  Depth (m):     {target_depth:>15.2f} {shared_data['depth']:>15.2f}\n"
+            f"  Depth (m):     {target_depth:>15.2f} {measured_depth:>15.2f}\n"
             f"  Roll  (°):     {target_roll:>15.2f} {shared_data['roll']:>15.2f}\n"
             f"  Pitch (°):     {target_pitch:>15.2f} {shared_data['pitch']:>15.2f}\n"
             f"  Yaw   (°):     {target_yaw:>15.2f} {shared_data['yaw']:>15.2f}\n"
@@ -196,6 +195,15 @@ def main():
         # Clear screen once at start or just use the Home cursor trick
         print(dashboard, end='', flush=False)
 
+        cam_ids = list(shared_data['last_frames'].keys())
+        for cam_id in cam_ids:
+            frame = shared_data['last_frames'][cam_id]
+            if frame is not None:
+                cv2.imshow(cam_id, frame)
+            
+        # waitKey(1) is required to actually render the window
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            running = False
 
     # On exit: stop thrusters safely
     pygame.quit()

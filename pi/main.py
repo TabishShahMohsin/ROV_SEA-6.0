@@ -10,7 +10,12 @@ import imagezmq
 import pyrealsense2 as rs
 import numpy as np
 import ms5837
+from picamera2 import Picamera2
+from imu import IMU
 
+# Initialize IMU
+imu_sensor = IMU(port='/dev/ttyUSB0') # Check your port with v4l2-ctl or dmesg
+imu_sensor.start()
 
 sensor = ms5837.MS5837_30BA()
 sensor.init()
@@ -21,7 +26,7 @@ cpu = CPUTemperature()
 # PC_IP = "192.168.137.1"  # Replace with your Base Station IP
 # PC_IP = socket.gethostbyname("laptop.local")
 # PC_IP = "192.168.0.113"
-PC_IP = socket.gethostbyname('Tabishs-MacBook-Air.local')
+PC_IP = socket.gethostbyname('mba.local')
 PI_IP = "0.0.0.0"        
 UDP_PORT_DATA = 5005    
 UDP_PORT_CMD = 5006     
@@ -41,10 +46,10 @@ telemetry = {
     "depth": 0,
     "cpu_temp": cpu.temperature,
     "ps_temp": 0,
-    "timestamp": time.time(),
-    "roll": time.time(),
-    "pitch": time.time(),   
-    "yaw": time.time()     
+    "timestamp":0,
+    "roll": 0,
+    "pitch": 0,   
+    "yaw": 0     
 }
 
 try:
@@ -69,45 +74,48 @@ SENDER = imagezmq.ImageSender(connect_to=f'tcp://{PC_IP}:5555')
 HOSTNAME = socket.gethostname()
 
 def video_stream_loop():
-    """Thread to capture from RealSense and PiCam and send via ImageZMQ."""
+    """Thread to capture from RealSense and PiCam using native Picamera2."""
     # 1. Initialize RealSense
     pipeline = rs.pipeline()
-    config = rs.config()
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-    
-    # 2. Initialize PiCam (using OpenCV index 0)
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    rs_config = rs.config()
+    rs_config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+    # 2. Initialize PiCam via native Picamera2 (The working way!)
+    picam2 = Picamera2()
+    pc_config = picam2.create_preview_configuration(main={"size": (640, 480)})
+    picam2.configure(pc_config)
+    picam2.start()
 
     try:
-        pipeline.start(config)
-        print("RealSense and PiCam streams started.")
+        pipeline.start(rs_config)
+        print("RealSense and PiCam (Native) streams started.")
     except Exception as e:
         print(f"Camera Startup Error: {e}")
 
     while is_running:
         try:
             # --- Handle RealSense ---
-            frames = pipeline.wait_for_frames(timeout_ms=100)
+            frames = pipeline.wait_for_frames(timeout_ms=50) # Lower timeout
             color_frame = frames.get_color_frame()
             if color_frame:
                 realsense_img = np.asanyarray(color_frame.get_data())
-                # Label the stream so the Base Station knows which is which
                 SENDER.send_image(f"{HOSTNAME}_realsense", realsense_img)
 
-            # --- Handle PiCam ---
-            ret, picam_img = cap.read()
-            if ret:
+            # --- Handle PiCam (Native Capture) ---
+            # capture_array() returns RGB, so we convert to BGR for the Base Station
+            frame_rgb = picam2.capture_array()
+            picam_img = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            
+            if picam_img is not None:
                 SENDER.send_image(f"{HOSTNAME}_picam", picam_img)
 
         except Exception as e:
-            # Prevent the whole script from crashing if a frame drops
-            time.sleep(0.1)
+            # print(f"Streaming Error: {e}")
+            time.sleep(0.01)
             continue
 
     pipeline.stop()
-    cap.release()
+    picam2.stop()
 
 # --- Ramping Functions ---
 
@@ -144,16 +152,17 @@ def sensor_sender():
         try:
             if sock is None:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sensor.read(),
+            sensor.read()
+            roll, pitch, yaw = imu_sensor.get_angles()
             telemetry_data = {
                 "pressure": sensor.pressure(),
                 "cpu_temp": cpu.temperature,
                 "timestamp": time.time(),
                 "depth": sensor.depth(),
                 "water_temp": sensor.temperature(),
-                "roll": 2,
-                "pitch": 2,   
-                "yaw": 2     
+                "roll": roll,
+                "pitch": pitch,   
+                "yaw": yaw     
             }
             
             message = json.dumps(telemetry_data).encode()

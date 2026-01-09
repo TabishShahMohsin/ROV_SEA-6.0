@@ -5,6 +5,7 @@ sudo apt install python3-picamera2 python3-opencv
 
 '''
 rpicam-hello --list-cameras
+v4l2-ctl --list-devices
 '''
 
 import cv2

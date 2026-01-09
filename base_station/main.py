@@ -12,11 +12,6 @@ from kf import DepthKalmanFilter
 import cv2
 import imagezmq
 
-# It takes IMU 10s to start
-# for i in range(11):
-#     print(f"Starting CountDown: {11 - i}")
-#     time.sleep(1) 
-
 shared_data = {
     # Shared from base station to pi
     "pwms": [1500] * 8,
@@ -101,11 +96,11 @@ def telemetry_listener():
             shared_data['cpu_temp'] = telemetry['cpu_temp']
             shared_data['timestamp'] = telemetry['timestamp']
             shared_data['pressure'] = telemetry['pressure'] - PRESSURE_OFFSET
-            shared_data['depth'] = telemetry['depth']
+            # shared_data['depth'] = telemetry['depth']
             shared_data['water_temp'] = telemetry['water_temp']
-            shared_data['roll'] = telemetry['roll']
-            shared_data['pitch'] = telemetry['pitch']
-            shared_data['yaw'] = telemetry['yaw']
+            shared_data['roll'] = telemetry['roll'] - ROLL_OFFSET
+            shared_data['pitch'] = telemetry['pitch'] - PITCH_OFFSET
+            shared_data['yaw'] = telemetry['yaw'] - YAW_OFFSET
             # In a real app, you'd save this to a global for the HUD to draw
         except socket.timeout:
             continue
@@ -127,12 +122,17 @@ def main():
 
     kf = DepthKalmanFilter()
 
-    depth_pid = PID(1.2, 0.1, 0.4, 1, -1)
     target_depth = 0
+    depth_pid = PID(DEPTH_KP, DEPTH_KI, DEPTH_KD, 1, -1)
 
     target_roll = 0
+    roll_pid = PID(ROLL_KP, ROLL_KI, ROLL_KD, 1, -1, is_angle=True)
+
     target_pitch = 0
+    pitch_pid = PID(PITCH_KP, PITCH_KI, PITCH_KD, 1, -1, is_angle=True)
+
     target_yaw = 0
+    yaw_pid = PID(YAW_KP, YAW_KI, YAW_KD, 1, -1, is_angle=True)
 
     thread1 = threading.Thread(target=telemetry_listener, daemon=True)
     thread2 = threading.Thread(target=command_sender, daemon=True)
@@ -159,12 +159,32 @@ def main():
         raw_inputs = controller.get_input_vector()
         raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch, raw_yaw = raw_inputs
 
-        # --- HEAVE CONTROL LOGIC ---
-        target_depth += raw_heave * 0.5 * dt
-        heave_command = depth_pid.compute(measured_depth, target_depth, dt)
+        if DEPTH_PID:
+            target_depth += raw_heave * 0.5 * dt
+            heave_command = depth_pid.compute(measured_depth, target_depth, dt)
+        else:
+            heave_command = raw_heave
+
+        if PITCH_PID:
+            target_pitch += raw_pitch * 20 * dt
+            pitch_command = pitch_pid.compute(shared_data['pitch'], target_pitch, dt)
+        else:
+            pitch_command = raw_pitch
+
+        if ROLL_PID:
+            target_roll += raw_roll * 20 * dt
+            roll_command = roll_pid.compute(shared_data['roll'], target_roll, dt)
+        else:
+            roll_command = raw_roll
+
+        if YAW_PID:
+            target_yaw += raw_yaw * 20 * dt
+            yaw_command = yaw_pid.compute(shared_data['yaw'], target_yaw, dt)
+        else:
+            yaw_command = raw_yaw
 
         # Get thruster force distribution
-        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, heave_command, raw_roll, raw_pitch, raw_yaw)
+        thruster_forces = compute_thruster_forces(raw_surge, raw_sway, heave_command, roll_command, pitch_command, yaw_command)
 
         # Convert forces to PWM
         thruster_pwms = [map_force_to_pwm(f) for f in thruster_forces]
@@ -175,7 +195,8 @@ def main():
         f = thruster_forces
         
         dashboard = (
-            f"\033[H"  # Move cursor to top-left (Home)
+            f"\033[H" +  # Move cursor to top-left (Home)
+            f"\n"*20 +
             f"--- ROV_SEA-6.0 DASHBOARD ---\n"
             f"SYSTEM: Pressure: {p_curr:>7.2f} mb | Pi Temp: {pi_temp:>4.1f}°C\n"
             f"{'-'*60}\n"

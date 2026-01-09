@@ -33,7 +33,7 @@ UDP_PORT_CMD = 5006
 
 # --- Ramping Constants ---
 RAMP_STEP = 15        # How many Âµs to change per loop iteration
-LOOP_FREQ = 0.05      # 20Hz update (50ms)
+LOOP_FREQ = 0.002      # 20Hz update (50ms)
 
 # Global PWM States
 # target_pwms: what the base station is asking for

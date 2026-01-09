@@ -87,10 +87,34 @@ WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])
 
 # Things to Calibrate:
 
-PRESSURE_OFFSET = 988 - 1013.25 # mbar # Pressure isn't exactly p_atm, but changes for whether and location
+PRESSURE_OFFSET = 988 - 1013.25 # mbar # Diff for location and whether
+ROLL_OFFSET = 0
+PITCH_OFFSET = 0
+YAW_OFFSET = 50 # Make this in the direction of the gate
 
+DEPTH_PID = True
+DEPTH_KP = 1.2
+DEPTH_KI = 0.1
+DEPTH_KD = 0.4
+
+# Angle in degrees to -1 to 1
+PITCH_PID = False
+PITCH_KP = 0.04
+PITCH_KI = 0.005
+PITCH_KD = 0.03
+
+# Angle in degrees to -1 to 1
+ROLL_PID = False
+ROLL_KP = 0.04
+ROLL_KI = 0.005
+ROLL_KD = 0.03
+
+# Angle in degrees to -1 to 1
+YAW_PID = False
+YAW_KP = 0.04
+YAW_KI = 0.0005
+YAW_KD = 0.03
 
 # To be implemented
 RECORD_SENSORS = False
 RECORD_FOOTAGE = False
-auto_depth_hold = True

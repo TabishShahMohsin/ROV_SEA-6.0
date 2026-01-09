@@ -17,7 +17,7 @@ class PID:
         
         # Logic for Angles: Shortest path wrap (e.g. 350->10 is +20, not -340)
         if self.is_angle:
-            error = (error + math.pi) % (2 * math.pi) - math.pi
+            error = (error + 180) % (2 * 180) - 180
 
         # Proportional
         p_out = self.kp * error

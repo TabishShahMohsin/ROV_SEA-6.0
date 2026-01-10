@@ -22,8 +22,8 @@ config.enable_stream(rs.stream.depth, res_w, res_h, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, res_w, res_h, rs.format.bgr8, 30)
 config.enable_stream(rs.stream.infrared, 1, res_w, res_h, rs.format.y8, 30)
 config.enable_stream(rs.stream.infrared, 2, res_w, res_h, rs.format.y8, 30)
-# config.enable_stream(rs.stream.accel)
-# config.enable_stream(rs.stream.gyro)
+config.enable_stream(rs.stream.accel)
+config.enable_stream(rs.stream.gyro)
 
 # Start streaming
 profile = pipeline.start(config)
@@ -47,8 +47,8 @@ try:
         color_frame = frames.get_color_frame()
         ir_left = frames.get_infrared_frame(1)
         ir_right = frames.get_infrared_frame(2)
-        #accel = frames.first_or_default(rs.stream.accel).as_motion_frame().get_motion_data()
-        #gyro = frames.first_or_default(rs.stream.gyro).as_motion_frame().get_motion_data()
+        accel = frames.first_or_default(rs.stream.accel).as_motion_frame().get_motion_data()
+        gyro = frames.first_or_default(rs.stream.gyro).as_motion_frame().get_motion_data()
 
         if not depth_frame or not color_frame: continue
 
@@ -66,14 +66,12 @@ try:
 
         cv2.imshow('D435i: RGB | Depth | IR-L | IR-R', cv2.resize(display, (1280, 720)))
 
-        '''
         # Dashboard printing (leveled in terminal)
         ts = frames.get_timestamp()
         status = (f"\rTS: {ts:.2f} | ACCEL: x:{accel.x:>5.2f} y:{accel.y:>5.2f} z:{accel.z:>5.2f} | "
                   f"GYRO: x:{gyro.x:>5.2f} y:{gyro.y:>5.2f} z:{gyro.z:>5.2f}")
         sys.stdout.write(status)
         sys.stdout.flush()
-        '''
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

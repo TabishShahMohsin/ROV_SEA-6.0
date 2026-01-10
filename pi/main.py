@@ -74,48 +74,60 @@ SENDER = imagezmq.ImageSender(connect_to=f'tcp://{PC_IP}:5555')
 HOSTNAME = socket.gethostname()
 
 def video_stream_loop():
-    """Thread to capture from RealSense and PiCam using native Picamera2."""
-    # 1. Initialize RealSense
-    pipeline = rs.pipeline()
-    rs_config = rs.config()
-    rs_config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
-    # 2. Initialize PiCam via native Picamera2 (The working way!)
-    picam2 = Picamera2()
-    pc_config = picam2.create_preview_configuration(main={"size": (640, 480)})
-    picam2.configure(pc_config)
-    picam2.start()
-
-    try:
-        pipeline.start(rs_config)
-        print("RealSense and PiCam (Native) streams started.")
-    except Exception as e:
-        print(f"Camera Startup Error: {e}")
-
+    """Handles camera startup and automatic reconnection."""
+    global is_running
+    HOSTNAME = socket.gethostname()
+    
     while is_running:
+        pipeline = None
+        picam2 = None
+        sender = None
+        
         try:
-            # --- Handle RealSense ---
-            frames = pipeline.wait_for_frames(timeout_ms=50) # Lower timeout
-            color_frame = frames.get_color_frame()
-            if color_frame:
-                realsense_img = np.asanyarray(color_frame.get_data())
-                SENDER.send_image(f"{HOSTNAME}_realsense", realsense_img)
-
-            # --- Handle PiCam (Native Capture) ---
-            # capture_array() returns RGB, so we convert to BGR for the Base Station
-            frame_rgb = picam2.capture_array()
-            picam_img = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            print(f"[Video] Attempting to connect to Base Station at {PC_IP}...")
+            sender = imagezmq.ImageSender(connect_to=f'tcp://{PC_IP}:5555')
             
-            if picam_img is not None:
-                SENDER.send_image(f"{HOSTNAME}_picam", picam_img)
+            # 1. Start RealSense
+            pipeline = rs.pipeline()
+            rs_config = rs.config()
+            rs_config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+            pipeline.start(rs_config)
+            
+            # 2. Start PiCam (Explicitly tell it NOT to probe other UVC devices)
+            # We use index 0 or find the first internal cam to avoid grabbing RealSense
+            picam2 = Picamera2() 
+            pc_config = picam2.create_preview_configuration(main={"size": (640, 480)})
+            picam2.configure(pc_config)
+            picam2.start()
+            
+            print("[Video] Both streams started successfully.")
+
+            while is_running:
+                # Capture RealSense
+                frames = pipeline.wait_for_frames(timeout_ms=100)
+                color_frame = frames.get_color_frame()
+                if color_frame:
+                    rs_img = np.asanyarray(color_frame.get_data())
+                    sender.send_image(f"{HOSTNAME}_realsense", rs_img)
+
+                # Capture PiCam
+                pc_img_rgb = picam2.capture_array()
+                pc_img_bgr = cv2.cvtColor(pc_img_rgb, cv2.COLOR_RGB2BGR)
+                sender.send_image(f"{HOSTNAME}_picam", pc_img_bgr)
 
         except Exception as e:
-            # print(f"Streaming Error: {e}")
-            time.sleep(0.01)
-            continue
-
-    pipeline.stop()
-    picam2.stop()
+            print(f"[Video] Stream error: {e}. Retrying in 3s...")
+            # Cleanup before retry
+            if pipeline: 
+                try: pipeline.stop()
+                except: pass
+            if picam2: 
+                try: picam2.stop()
+                except: pass
+            if sender:
+                try: sender.close()
+                except: pass
+            time.sleep(3)
 
 # --- Ramping Functions ---
 

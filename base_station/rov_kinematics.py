@@ -51,9 +51,9 @@ def compute_thruster_forces(raw_surge, raw_sway, raw_heave, raw_roll, raw_pitch,
     B_vertical = np.zeros((3, 4))
 
     for i, ((x, y), theta) in enumerate(zip(positions, lateral_thrusters_angles)):
-        B_lateral[0, i] = np.sin(theta) # Contribution to Fx (Surge)
-        B_lateral[1, i] = np.cos(theta) # Contribution to Fy (Sway)
-        B_lateral[2, i] = x * np.cos(theta) - y * np.sin(theta) # Contribution to Tz (Yaw)
+        B_lateral[0, i] = np.cos(theta) # Contribution to Fx (Surge)
+        B_lateral[1, i] = np.sin(theta) # Contribution to Fy (Sway)
+        B_lateral[2, i] = x * np.sin(theta) - y * np.cos(theta) # Contribution to Tz (Yaw)
 
     for i, (x, y) in enumerate(positions[4:]):
         B_vertical[0, i] = -x # Contribution to Ty (Pitch)

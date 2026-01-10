@@ -25,28 +25,22 @@ import numpy as np
 
 '''
 
-# PI_IP = "192.168.137.2"
-PI_IP = socket.gethostbyname("auv.local")
+PI_IP = "192.168.137.2"
+# PI_IP = socket.gethostbyname("auv.local")
 UDP_PORT_DATA = 5005
 UDP_PORT_CMD = 5006
 
 ROV_WIDTH_MM = 262.629
 ROV_LENGTH_MM = 195.311
 
-# "V" Configuration: T1(45), T2(135), T3(-45), T4(-135)
-THRUSTER_ANGLES_DEG = [45, 135, -45, -135] # From +ve x-axis
+# "V" Configuration: T1(45), T2(-45), T3(135), T4(-135)
+THRUSTER_ANGLES_DEG = [45, -45, 135, -135] # From +ve x-axis (Force exerted to the vehicle)
 
 SIN_45 = math.sin(math.radians(45))
 
 # MAX thrust offered by an individual thruster
 # This change was made due to problems in cancelling moments: from fixing PWM ranges to thrust ranges
 MAX_THRUST = 2.35 
-
-MAX_AXIAL_FORCE = 4 * SIN_45 * MAX_THRUST
-MAX_YAW_TORQUE = 2 * SIN_45 * (ROV_LENGTH_MM + ROV_WIDTH_MM) * MAX_THRUST
-MAX_HEAVE_FORCE = 4 * MAX_THRUST
-MAX_ROLL_TORQUE = 4 * (ROV_WIDTH_MM / 2) * MAX_THRUST
-MAX_PITCH_TORQUE = 4 * (ROV_LENGTH_MM / 2) * MAX_THRUST
 
 PWM_NEUTRAL = 1500
 
@@ -85,6 +79,17 @@ W8 = True
 
 WORKING_THRUSTERS = np.array([W1, W2, W3, W4, W5, W6, W7, W8])
 
+# Need to find these again for the working thrusters otherwise they will max out before the joystick reaches extrema
+MAX_AXIAL_FORCE = 4 * SIN_45 * MAX_THRUST
+MAX_YAW_TORQUE = 2 * SIN_45 * (ROV_LENGTH_MM + ROV_WIDTH_MM) * MAX_THRUST
+MAX_HEAVE_FORCE = 4 * MAX_THRUST
+MAX_ROLL_TORQUE = 4 * (ROV_WIDTH_MM / 2) * MAX_THRUST
+MAX_PITCH_TORQUE = 4 * (ROV_LENGTH_MM / 2) * MAX_THRUST
+
+# To be implemented
+RECORD_SENSORS = False
+RECORD_FOOTAGE = False
+
 # Things to Calibrate:
 
 PRESSURE_OFFSET = 988 - 1013.25 # mbar # Diff for location and whether
@@ -92,6 +97,7 @@ ROLL_OFFSET = 0
 PITCH_OFFSET = 0
 YAW_OFFSET = 50 # Make this in the direction of the gate
 
+# meter to -1 to 1
 DEPTH_PID = True
 DEPTH_KP = 1.2
 DEPTH_KI = 0.1
@@ -114,7 +120,3 @@ YAW_PID = False
 YAW_KP = 0.04
 YAW_KI = 0.0005
 YAW_KD = 0.03
-
-# To be implemented
-RECORD_SENSORS = False
-RECORD_FOOTAGE = False

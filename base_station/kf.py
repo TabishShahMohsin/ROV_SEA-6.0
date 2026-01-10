@@ -17,8 +17,8 @@ class DepthKalmanFilter:
         self.Q = np.array([[1e-4, 0], [0, 1e-3]]) 
 
         # Mesurement Noise Covariance: z = Hx + v, v ~ N(0, R)
-        self.R = 0.001 # Measurement noise (Bar30 is very clean, keep this small)
-        self.F = np.array([[1, 0.02], [0, 1]]) # State transition (assuming 50Hz dt=0.02 initially)
+        self.R = 0.01 # Measurement noise (Bar30 is very clean, keep this small)
+        self.F = np.array([[1, 0.034], [0, 1]]) # State transition (assuming 30Hz dt=0.034 initially)
         self.H = np.array([[1, 0]]) # We only measure depth, not velocity z = Hx
 
     def update(self, measured_depth, dt):
